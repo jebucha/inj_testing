@@ -127,6 +127,10 @@ From `add-prompt-injection-benchmark`:
 ## Cross-links
 
 - [`providers.py`](providers.html) — the config that supplies the `Provider`
+- [`provider_overrides.py`](provider_overrides.html) — the UI-added model
+  overlay the summarization picker validates against (merged config)
+- [`model_discovery.py`](model_discovery.html) — the sibling `/models`
+  caller that mirrors this module's seam and failure taxonomy
 - [`main.py`](main.html) — the bounded executor, the validation order, and
   the `POST /api/llm-call` route over `call_with_preset`
 - [`library.py`](library.html) — the read-side discipline `read_summary` mirrors

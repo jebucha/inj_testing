@@ -20,11 +20,14 @@ from pydantic import BaseModel
 from app import chain as chain_mod
 from app import log as applog
 from app import logbus
+from app import model_discovery
 from app import summarize as summarize_mod
 from app.errors import (
     InputTooLongError,
+    InvalidModelError,
     InvalidPresetError,
     InvalidProviderError,
+    ModelNotRemovableError,
     SummaryNotConfiguredError,
     TranscriptError,
 )
@@ -35,6 +38,14 @@ from app.library import (
 )
 from app.log import get_logger
 from app.persist import derive_file_name, save_transcript
+from app.provider_overrides import (
+    ModelNotInOverlayError,
+    ProviderOverridesWriteError,
+    add_model,
+    apply_overrides,
+    load_overrides,
+    remove_model,
+)
 from app.providers import load_providers
 from app.settings import load_settings, save_settings
 
@@ -53,6 +64,15 @@ LOG_POLL_TIMEOUT = 0.5
 SUMMARIZE_MAX_CONCURRENCY = 2
 SUMMARIZE_EXECUTOR = ThreadPoolExecutor(
     max_workers=SUMMARIZE_MAX_CONCURRENCY, thread_name_prefix="summarize"
+)
+
+# Max concurrent model-discovery calls (GET /models). Discovery gets its own
+# bounded pool rather than SUMMARIZE_EXECUTOR (design D6): a 120 s summarize
+# must not block a fast /models call, and a hanging discovery must not starve
+# summarization.
+DISCOVERY_MAX_CONCURRENCY = 2
+DISCOVERY_EXECUTOR = ThreadPoolExecutor(
+    max_workers=DISCOVERY_MAX_CONCURRENCY, thread_name_prefix="model-discovery"
 )
 
 # Max request-body size in bytes (5 MiB). Checked against the declared
@@ -97,6 +117,13 @@ def _listen_port() -> int:
         return int(os.environ.get("PORT", DEFAULT_PORT))
     except ValueError:
         return DEFAULT_PORT
+
+
+def _merged_provider_config():
+    """The effective provider config: file providers/models plus the
+    UI-added overlay models (design D2). The single source both the listing
+    and the summarize validation read, per request."""
+    return apply_overrides(load_providers(), load_overrides())
 
 
 @asynccontextmanager
@@ -196,14 +223,158 @@ def create_app() -> FastAPI:
         # without a restart, a missing/malformed file degrades to "not
         # configured". The response is secret-free: API keys and base URLs
         # never leave the server (design decision 7).
-        config = await asyncio.to_thread(load_providers)
+        # Effective config = file config plus overlay (design D2): added
+        # models are listed after the file models, with addedModels exposing
+        # the removable subset. The response is secret-free: API keys and
+        # base URLs never leave the server.
+        config = await asyncio.to_thread(_merged_provider_config)
         return {
             "default": config.default,
             "providers": [
-                {"id": p.id, "name": p.name, "models": list(p.models)}
+                {"id": p.id, "name": p.name, "models": list(p.models),
+                 "addedModels": list(p.added_models)}
                 for p in config.providers
             ],
         }
+
+    @app.post("/api/providers/{provider_id}/models")
+    async def add_model_endpoint(provider_id: str, request: Request):
+        # Validate the body before any filesystem access (design D5): a
+        # non-object body or a missing model field is 400 INVALID_BODY with
+        # no write; a model value that violates the id rules, or one that
+        # would exceed the per-provider cap, is 400 INVALID_MODEL. The
+        # provider must exist in the file config (400 INVALID_PROVIDER) —
+        # the overlay never introduces providers. The read-modify-write
+        # runs in a worker thread (blocking I/O off the event loop) and
+        # never touches the fetch chain or the single-flight semaphore.
+        try:
+            body = await request.json()
+        except Exception:
+            body = None
+        if not isinstance(body, dict) or "model" not in body:
+            return JSONResponse(
+                status_code=400,
+                content={"error": {"code": "INVALID_BODY",
+                                   "message": "Expected a JSON object with a "
+                                              "model field."}},
+            )
+        model = body["model"]
+        config = await asyncio.to_thread(load_providers)
+        if not any(p.id == provider_id for p in config.providers):
+            error = InvalidProviderError()
+            return JSONResponse(
+                status_code=error.status,
+                content={"error": {"code": error.code,
+                                   "message": error.message}},
+            )
+        try:
+            added, models = await asyncio.to_thread(add_model, provider_id, model)
+        except InvalidModelError as exc:
+            return JSONResponse(
+                status_code=exc.status,
+                content={"error": {"code": exc.code, "message": exc.message}},
+            )
+        except ProviderOverridesWriteError:
+            # provider_overrides_save_failed was already logged by the store.
+            return JSONResponse(
+                status_code=500,
+                content={"error": {"code": "WRITE_FAILED",
+                                   "message": "Could not save the model "
+                                              "overrides file."}},
+            )
+        return {"provider": provider_id, "model": added,
+                "models": list(models)}
+
+    @app.delete("/api/providers/{provider_id}/models")
+    async def remove_model_endpoint(provider_id: str, request: Request):
+        # The model id travels in the JSON body, not the path: model ids
+        # routinely contain "/" (design D4). The provider must exist in the
+        # file config (400 INVALID_PROVIDER); a config-file model is not
+        # removable (400 MODEL_NOT_REMOVABLE); an id in neither set is
+        # 404 NOT_FOUND. The read-modify-write runs in a worker thread and
+        # never touches the fetch chain or the single-flight semaphore.
+        try:
+            body = await request.json()
+        except Exception:
+            body = None
+        if not isinstance(body, dict) or "model" not in body:
+            return JSONResponse(
+                status_code=400,
+                content={"error": {"code": "INVALID_BODY",
+                                   "message": "Expected a JSON object with a "
+                                              "model field."}},
+            )
+        model = body["model"]
+        config = await asyncio.to_thread(load_providers)
+        if not any(p.id == provider_id for p in config.providers):
+            error = InvalidProviderError()
+            return JSONResponse(
+                status_code=error.status,
+                content={"error": {"code": error.code,
+                                   "message": error.message}},
+            )
+        try:
+            removed, models = await asyncio.to_thread(
+                remove_model, provider_id, model
+            )
+        except ModelNotRemovableError as exc:
+            return JSONResponse(
+                status_code=exc.status,
+                content={"error": {"code": exc.code, "message": exc.message}},
+            )
+        except ModelNotInOverlayError:
+            return JSONResponse(
+                status_code=404,
+                content={"error": {"code": "NOT_FOUND",
+                                   "message": "That model is not configured "
+                                              "for this provider."}},
+            )
+        except ProviderOverridesWriteError:
+            # provider_overrides_save_failed was already logged by the store.
+            return JSONResponse(
+                status_code=500,
+                content={"error": {"code": "WRITE_FAILED",
+                                   "message": "Could not save the model "
+                                              "overrides file."}},
+            )
+        return {"provider": provider_id, "model": removed,
+                "models": list(models)}
+
+    @app.get("/api/providers/{provider_id}/available-models")
+    async def available_models_endpoint(provider_id: str):
+        # Discovery (design D6): the provider is resolved against the file
+        # config first (400 INVALID_PROVIDER, backend-free) — the overlay
+        # never changes which base URL is contacted. The /models call runs on
+        # the dedicated bounded pool, so a hanging discovery can neither
+        # starve summarization nor the default executor other endpoints
+        # share; a backend failure is 502 PROVIDER_ERROR with the failure
+        # already logged by the module. The response carries model id strings
+        # only — never the base URL or API key. Never touches the fetch chain
+        # or the single-flight semaphore.
+        config = await asyncio.to_thread(load_providers)
+        provider = next(
+            (p for p in config.providers if p.id == provider_id), None
+        )
+        if provider is None:
+            error = InvalidProviderError()
+            return JSONResponse(
+                status_code=error.status,
+                content={"error": {"code": error.code,
+                                   "message": error.message}},
+            )
+        try:
+            models = await asyncio.get_running_loop().run_in_executor(
+                DISCOVERY_EXECUTOR,
+                contextvars.copy_context().run,
+                model_discovery.list_models,
+                provider,
+            )
+        except TranscriptError as exc:
+            return JSONResponse(
+                status_code=exc.status,
+                content={"error": {"code": exc.code, "message": exc.message}},
+            )
+        return {"models": list(models)}
 
     @app.get("/api/settings")
     async def settings_read_endpoint():
@@ -302,7 +473,10 @@ def create_app() -> FastAPI:
                 content={"error": {"code": "INVALID_NAME",
                                    "message": "Invalid transcript name."}},
             )
-        config = await asyncio.to_thread(load_providers)
+        # The merged config is the single source the endpoint validates
+        # against (design D2): overlay-added models are accepted exactly
+        # like file models.
+        config = await asyncio.to_thread(_merged_provider_config)
         if not config.providers:
             error = SummaryNotConfiguredError()
             return JSONResponse(

@@ -636,9 +636,10 @@ def test_providers_endpoint_omits_secrets(api):
     assert response.status_code == 200
     body = response.json()
     alpha = next(p for p in body["providers"] if p["id"] == "alpha")
-    assert set(alpha.keys()) == {"id", "name", "models"}
+    assert set(alpha.keys()) == {"id", "name", "models", "addedModels"}
     assert alpha["name"] == "Alpha Local"
     assert alpha["models"] == ["model-a1", "model-a2"]
+    assert alpha["addedModels"] == []
     # neither the API key nor the base URL appears anywhere in the body
     assert "sk-endpoint-test-key" not in response.text
     assert "41411" not in response.text and "41412" not in response.text
@@ -671,6 +672,40 @@ def test_providers_endpoint_not_configured_empty(api):
     assert response.json() == {"default": None, "providers": []}
 
 
+def test_providers_endpoint_includes_added_models(api):
+    """T-TRANSCRIPT-SUMMARIZATION-056"""
+    (api["transcript_dir"] / "provider_overrides.json").write_text(
+        json.dumps({"alpha": ["model-ax"]}), encoding="utf-8"
+    )
+
+    response = api["client"].get("/api/providers")
+
+    assert response.status_code == 200
+    body = response.json()
+    alpha = next(p for p in body["providers"] if p["id"] == "alpha")
+    # config-file models in file order, then the added model
+    assert alpha["models"] == ["model-a1", "model-a2", "model-ax"]
+
+
+def test_providers_endpoint_exposes_added_models(api):
+    """T-TRANSCRIPT-SUMMARIZATION-058"""
+    (api["transcript_dir"] / "provider_overrides.json").write_text(
+        json.dumps({"alpha": ["model-ax", "model-a1", "model-ay"]}),
+        encoding="utf-8",
+    )
+
+    response = api["client"].get("/api/providers")
+
+    body = response.json()
+    alpha = next(p for p in body["providers"] if p["id"] == "alpha")
+    # only the overlay-added ids, in the order they appear in `models`
+    assert alpha["addedModels"] == ["model-ax", "model-ay"]
+    # a provider without additions exposes an empty provenance list
+    beta = next(p for p in body["providers"] if p["id"] == "beta")
+    assert beta["addedModels"] == []
+    assert beta["models"] == ["model-b1"]
+
+
 # --- T-TRANSCRIPT-SUMMARIZATION-009, 012 .. 017: POST /api/summarize ----------
 
 
@@ -701,6 +736,23 @@ def test_unknown_provider_or_model_rejected(api):
 
     # no backend request was made
     assert api["dispatch"].calls == []
+
+
+def test_summarize_accepts_added_model(api):
+    """T-TRANSCRIPT-SUMMARIZATION-057"""
+    (api["transcript_dir"] / "provider_overrides.json").write_text(
+        json.dumps({"alpha": ["model-ax"]}), encoding="utf-8"
+    )
+
+    response = api["client"].post(
+        "/api/summarize", json=_valid_body(model="model-ax")
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"summary": "The summary."}
+    # the backend call was made with the added model
+    assert len(api["dispatch"].calls) == 1
+    assert api["dispatch"].calls[0]["model"] == "model-ax"
 
 
 def test_invalid_name_rejected(api):

@@ -21,6 +21,8 @@
   <li><a href="library.html">app/library.py</a></li>
   <li><a href="providers.html">app/providers.py</a></li>
   <li><a href="summarize.html" aria-current="page">app/summarize.py</a></li>
+  <li><a href="provider_overrides.html">app/provider_overrides.py</a></li>
+  <li><a href="model_discovery.html">app/model_discovery.py</a></li>
   <li><a href="settings.html">app/settings.py</a></li>
   <li><a href="log.html">app/log.py</a></li>
   <li><a href="logbus.html">app/logbus.py</a></li>
@@ -156,6 +158,10 @@ handles <code>ProviderCallError</code> internally.</p>
 <h2>Cross-links</h2>
 <ul>
 <li><a href="providers.html"><code>providers.py</code></a> — the config that supplies the <code>Provider</code></li>
+<li><a href="provider_overrides.html"><code>provider_overrides.py</code></a> — the UI-added model
+  overlay the summarization picker validates against (merged config)</li>
+<li><a href="model_discovery.html"><code>model_discovery.py</code></a> — the sibling <code>/models</code>
+  caller that mirrors this module's seam and failure taxonomy</li>
 <li><a href="main.html"><code>main.py</code></a> — the bounded executor, the validation order, and
   the <code>POST /api/llm-call</code> route over <code>call_with_preset</code></li>
 <li><a href="library.html"><code>library.py</code></a> — the read-side discipline <code>read_summary</code> mirrors</li>

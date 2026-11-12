@@ -32,6 +32,7 @@ class Provider:
     base_url: str
     api_key: str | None
     models: tuple[str, ...]  # model ids in file order
+    added_models: tuple[str, ...] = ()  # overlay additions, file read leaves this empty
 
 
 @dataclass(frozen=True)

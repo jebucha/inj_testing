@@ -37,6 +37,8 @@
   var benchmarkResults = document.getElementById("benchmark-results");
   var benchmarkTallyBody = document.querySelector("#benchmark-tally tbody");
   var benchmarkRows = document.getElementById("benchmark-rows");
+  var mmEmpty = document.getElementById("mm-empty");
+  var mmProviderList = document.getElementById("mm-provider-list");
 
   var ERROR_MESSAGES = {
     INVALID_URL:
@@ -56,8 +58,20 @@
     PROVIDER_ERROR:
       "The summarization backend failed — it may be down or overloaded. Please try again.",
     INPUT_TOO_LONG:
-      "This transcript is too long to summarize (over 100,000 characters)."
+      "This transcript is too long to summarize (over 100,000 characters).",
+    INVALID_MODEL:
+      "That model id is not valid — it must be 1 to 200 characters without control characters, and each provider holds at most 50 added models.",
+    MODEL_NOT_REMOVABLE:
+      "That model comes from the provider config file, so it cannot be removed from the UI. Edit the config file instead.",
+    NOT_FOUND:
+      "That model is not configured for this provider."
   };
+
+  // Discovery-specific failure message (design D7): a failed refresh must
+  // not read as a failed summary, so the /models path never falls back to
+  // the summarization PROVIDER_ERROR text.
+  var DISCOVERY_ERROR_MESSAGE =
+    "Could not refresh the model list from that backend — its models endpoint may be down or non-standard. Existing models are unchanged; you can still add a model by hand.";
 
   var currentTranscript = "";
   // Real file name of the displayed saved transcript ("" for a freshly
@@ -82,6 +96,12 @@
   // The autoSummarize setting as last known to be persisted server-side:
   // the revert target when a POST /api/settings write fails (design D6).
   var persistedAutoSummarize = false;
+  // Model-management section state (add-summarization-model-management
+  // D7/D8): the provider whose manage panel is open ("" = none) and the
+  // last discovered id list per provider — advisory only, it drives the Add
+  // buttons; persisted state lives server-side in the overrides file.
+  var openManageProviderId = "";
+  var discoveredModels = {};
 
   // --- injection benchmark state (prompt-injection-benchmark) -------------
   // True while a benchmark run's requests are in flight.
@@ -410,7 +430,7 @@
     return providerOptions.length ? providerOptions[defaultOptionIndex()] : null;
   }
 
-  function renderProviderPicker() {
+  function renderProviderPicker(preferred) {
     providerPicker.textContent = "";
     providerOptions = [];
     for (var i = 0; i < providers.length; i++) {
@@ -422,12 +442,23 @@
         providerPicker.appendChild(option);
       }
     }
-    // Pre-select the default provider's first model; without a usable
-    // default, the first option.
-    providerPicker.selectedIndex = defaultOptionIndex();
+    // Pre-select (design D8): the preferred pair — a just-added model, or a
+    // removal's previous selection when it survives — otherwise the default
+    // provider's first model, or the first option.
+    var index = defaultOptionIndex();
+    if (preferred) {
+      for (var k = 0; k < providerOptions.length; k++) {
+        if (providerOptions[k].provider === preferred.provider &&
+            providerOptions[k].model === preferred.model) {
+          index = k;
+          break;
+        }
+      }
+    }
+    providerPicker.selectedIndex = index;
   }
 
-  async function loadProviders() {
+  async function loadProviders(preferred) {
     try {
       var res = await fetch("/api/providers");
       if (!res.ok) return; // keep the not-configured state
@@ -438,9 +469,282 @@
       providers = [];
       defaultProviderId = null;
     }
-    renderProviderPicker();
+    // A provider that disappeared from the config takes its cached
+    // discovery list with it.
+    var known = {};
+    for (var p = 0; p < providers.length; p++) known[providers[p].id] = true;
+    for (var key in discoveredModels) {
+      if (Object.prototype.hasOwnProperty.call(discoveredModels, key) &&
+          !known[key]) {
+        delete discoveredModels[key];
+      }
+    }
+    renderProviderPicker(preferred);
     renderBenchmarkModels();
+    renderModelManagement();
     updateSummarizeEnabled();
+  }
+
+  // --- model management -----------------------------------------------------
+  // The always-visible "Summarization models" section (design D7): one row
+  // per configured provider (display name, effective model count, Manage)
+  // plus a per-provider panel with a manual-add form, a "Refresh from
+  // backend" discovery list with Add buttons, and the effective models with
+  // Remove offered for the UI-added subset only. Every string enters the DOM
+  // via textContent only.
+
+  function renderModelManagement() {
+    mmProviderList.textContent = "";
+    if (!providers.length) {
+      mmEmpty.hidden = false;
+      openManageProviderId = "";
+      return;
+    }
+    mmEmpty.hidden = true;
+    for (var i = 0; i < providers.length; i++) {
+      (function (provider) {
+        var row = document.createElement("div");
+        row.className = "mm-provider-row";
+        row.dataset.providerId = provider.id;
+        var nameSpan = document.createElement("span");
+        nameSpan.className = "mm-provider-name";
+        nameSpan.textContent = provider.name;
+        var countSpan = document.createElement("span");
+        countSpan.className = "mm-provider-count";
+        countSpan.textContent =
+          provider.models.length + " model" +
+          (provider.models.length === 1 ? "" : "s");
+        var manageBtn = document.createElement("button");
+        manageBtn.className = "mm-manage-btn";
+        manageBtn.type = "button";
+        manageBtn.textContent =
+          openManageProviderId === provider.id ? "Close" : "Manage";
+        manageBtn.addEventListener("click", function () {
+          openManageProviderId =
+            openManageProviderId === provider.id ? "" : provider.id;
+          renderModelManagement();
+        });
+        row.appendChild(nameSpan);
+        row.appendChild(countSpan);
+        row.appendChild(manageBtn);
+        mmProviderList.appendChild(row);
+        if (openManageProviderId === provider.id) {
+          mmProviderList.appendChild(buildManagePanel(provider));
+        }
+      })(providers[i]);
+    }
+  }
+
+  function buildManagePanel(provider) {
+    var panel = document.createElement("div");
+    panel.className = "mm-panel";
+    panel.dataset.providerId = provider.id;
+
+    // Manual add: id input + submit.
+    var form = document.createElement("form");
+    form.className = "mm-add-form";
+    var addInput = document.createElement("input");
+    addInput.className = "mm-add-input";
+    addInput.type = "text";
+    addInput.placeholder = "Model id (e.g. qwen3.5)";
+    addInput.autocomplete = "off";
+    addInput.spellcheck = false;
+    addInput.setAttribute("aria-label", "Model id to add");
+    var addBtn = document.createElement("button");
+    addBtn.className = "mm-add-btn";
+    addBtn.type = "submit";
+    addBtn.textContent = "Add";
+    form.appendChild(addInput);
+    form.appendChild(addBtn);
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      doAddModel(provider.id, addInput.value, addBtn);
+    });
+    panel.appendChild(form);
+
+    // Discovery refresh (advisory list, design D7).
+    var refreshBtn = document.createElement("button");
+    refreshBtn.className = "mm-refresh-btn";
+    refreshBtn.type = "button";
+    refreshBtn.textContent = "Refresh from backend";
+    refreshBtn.addEventListener("click", function () {
+      doDiscover(provider.id, refreshBtn);
+    });
+    panel.appendChild(refreshBtn);
+
+    panel.appendChild(buildDiscoveredList(provider));
+
+    // Effective models: the UI-added subset gets Remove, file models do not.
+    var modelsBox = document.createElement("div");
+    modelsBox.className = "mm-models";
+    var modelsTitle = document.createElement("p");
+    modelsTitle.className = "mm-models-title";
+    modelsTitle.textContent = "Models";
+    modelsBox.appendChild(modelsTitle);
+    var list = document.createElement("ul");
+    list.className = "mm-model-list";
+    for (var m = 0; m < provider.models.length; m++) {
+      (function (modelId) {
+        var item = document.createElement("li");
+        item.className = "mm-model-row";
+        var idSpan = document.createElement("span");
+        idSpan.className = "mm-model-id";
+        idSpan.textContent = modelId;
+        item.appendChild(idSpan);
+        if (provider.addedModels &&
+            provider.addedModels.indexOf(modelId) !== -1) {
+          var removeBtn = document.createElement("button");
+          removeBtn.className = "mm-remove-btn";
+          removeBtn.type = "button";
+          removeBtn.textContent = "Remove";
+          removeBtn.addEventListener("click", function () {
+            doRemoveModel(provider.id, modelId);
+          });
+          item.appendChild(removeBtn);
+        }
+        list.appendChild(item);
+      })(provider.models[m]);
+    }
+    modelsBox.appendChild(list);
+    panel.appendChild(modelsBox);
+    return panel;
+  }
+
+  // The last discovered id list for the provider (if any), each row with an
+  // Add button; ids already in the effective list are disabled.
+  function buildDiscoveredList(provider) {
+    var box = document.createElement("div");
+    box.className = "mm-discovered";
+    var ids = discoveredModels[provider.id];
+    if (!ids || !ids.length) {
+      box.hidden = true;
+      return box;
+    }
+    var title = document.createElement("p");
+    title.className = "mm-discovered-title";
+    title.textContent = "From the backend:";
+    box.appendChild(title);
+    for (var i = 0; i < ids.length; i++) {
+      (function (id) {
+        var row = document.createElement("div");
+        row.className = "mm-discovered-row";
+        var idSpan = document.createElement("span");
+        idSpan.className = "mm-discovered-id";
+        idSpan.textContent = id;
+        row.appendChild(idSpan);
+        var addBtn = document.createElement("button");
+        addBtn.className = "mm-discovered-add";
+        addBtn.type = "button";
+        if (provider.models.indexOf(id) !== -1) {
+          addBtn.disabled = true;
+          addBtn.textContent = "Added";
+        } else {
+          addBtn.textContent = "Add";
+          addBtn.addEventListener("click", function () {
+            doAddModel(provider.id, id, addBtn);
+          });
+        }
+        row.appendChild(addBtn);
+        box.appendChild(row);
+      })(ids[i]);
+    }
+    return box;
+  }
+
+  // Add a model id to the provider's overlay. On success the provider list
+  // reloads and the new pair is selected in the picker (design D8).
+  async function doAddModel(providerId, rawModel, busyBtn) {
+    var model = String(rawModel == null ? "" : rawModel).trim();
+    if (!model) return;
+    busyBtn.disabled = true;
+    try {
+      var res = await fetch(
+        "/api/providers/" + encodeURIComponent(providerId) + "/models", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ model: model })
+        }
+      );
+      var data = null;
+      try {
+        data = await res.json();
+      } catch (_) {
+        data = null;
+      }
+      if (!res.ok) {
+        var code = data && data.error ? data.error.code : null;
+        var serverMessage = data && data.error ? data.error.message : null;
+        showError(messageFor(code, serverMessage));
+        return;
+      }
+      clearError();
+      await loadProviders({ provider: providerId, model: data.model });
+    } catch (_) {
+      showError("Network error — could not reach the server. Please try again.");
+    } finally {
+      busyBtn.disabled = false;
+    }
+  }
+
+  // Remove a UI-added model. On success the provider list reloads; the
+  // picker keeps its previous selection when it survives the removal,
+  // otherwise it falls back to the default (design D8).
+  async function doRemoveModel(providerId, model) {
+    var previous = providerOptions[providerPicker.selectedIndex] || null;
+    try {
+      var res = await fetch(
+        "/api/providers/" + encodeURIComponent(providerId) + "/models", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ model: model })
+        }
+      );
+      var data = null;
+      try {
+        data = await res.json();
+      } catch (_) {
+        data = null;
+      }
+      if (!res.ok) {
+        var code = data && data.error ? data.error.code : null;
+        var serverMessage = data && data.error ? data.error.message : null;
+        showError(messageFor(code, serverMessage));
+        return;
+      }
+      clearError();
+      await loadProviders(previous);
+    } catch (_) {
+      showError("Network error — could not reach the server. Please try again.");
+    }
+  }
+
+  // Discovery: the backend's own model list, advisory only — a failure shows
+  // a discovery-specific message and never alters existing models (design D7).
+  async function doDiscover(providerId, busyBtn) {
+    busyBtn.disabled = true;
+    try {
+      var res = await fetch(
+        "/api/providers/" + encodeURIComponent(providerId) +
+          "/available-models"
+      );
+      var data = null;
+      try {
+        data = await res.json();
+      } catch (_) {
+        data = null;
+      }
+      if (!res.ok || !data || !Array.isArray(data.models)) {
+        showError(DISCOVERY_ERROR_MESSAGE);
+        return;
+      }
+      clearError();
+      discoveredModels[providerId] = data.models;
+      renderModelManagement();
+    } catch (_) {
+      showError(DISCOVERY_ERROR_MESSAGE);
+    } finally {
+      busyBtn.disabled = false;
+    }
   }
 
   // --- auto-summarize setting ----------------------------------------------
@@ -1150,6 +1454,35 @@
     },
     config_load_failed: function (e) {
       var line = "provider config load failed: " + e.path +
+                 " [" + e.reason + "]";
+      if (e.detail) line += " " + e.detail;
+      return line;
+    },
+    provider_model_added: function (e) {
+      return "model added: " + e.model + " to provider " + e.provider;
+    },
+    provider_model_removed: function (e) {
+      return "model removed: " + e.model + " from provider " + e.provider;
+    },
+    provider_models_refreshed: function (e) {
+      return (
+        "models refreshed: " + e.provider + " (" + e.count + " models) in " +
+        e.duration_ms + " ms"
+      );
+    },
+    provider_models_refresh_failed: function (e) {
+      var line = "model refresh failed: " + e.provider + " [" + e.reason + "]";
+      if (e.detail) line += " " + e.detail;
+      return line;
+    },
+    provider_overrides_load_failed: function (e) {
+      var line = "model overrides load failed: " + e.path +
+                 " [" + e.reason + "]";
+      if (e.detail) line += " " + e.detail;
+      return line;
+    },
+    provider_overrides_save_failed: function (e) {
+      var line = "model overrides save failed: " + e.path +
                  " [" + e.reason + "]";
       if (e.detail) line += " " + e.detail;
       return line;

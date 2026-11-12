@@ -13,7 +13,9 @@ structure of usable providers plus the default provider id, or the empty
 - `config_path() -> Path` — resolves `PROVIDERS_CONFIG` (default
   `providers.json` in the working directory) at call time.
 - `Provider` — frozen dataclass: `id`, `name` (display, falls back to the
-  id), `base_url`, `api_key` (optional), `models` (tuple of ids, file order).
+  id), `base_url`, `api_key` (optional), `models` (tuple of ids, file
+  order), and `added_models` (tuple, empty on a file read — populated only
+  by the overlay merge in `provider_overrides.apply_overrides`).
 - `ProviderConfig` — frozen dataclass: `providers` (tuple) + `default`
   (id or `None`).
 
@@ -24,6 +26,15 @@ structure of usable providers plus the default provider id, or the empty
 - **Read per call, never cached, never at startup.** Edits take effect on
   the next request without a restart, and the app boots with no config at
   all.
+- **The config file is operator-owned and read-only, by contract.** This
+  module never writes it. Models added through the UI live in a separate
+  writable overlay, `provider_overrides.json` in the transcript directory
+  (owned by [`provider_overrides.py`](provider_overrides.html)); the overlay
+  can only extend the model lists of providers defined in this file — never
+  introduce a provider, a base URL, or an API key. The effective provider
+  list is the file providers/models followed by the overlay's non-duplicate
+  additions, composed by `provider_overrides.apply_overrides` at the
+  endpoints, so `load_providers()` itself stays file-only.
 - **Missing file is the normal "not configured" state** — an empty result
   with *no* log entry. An unreadable file, malformed JSON, a malformed
   structure, or a file with no usable provider all return the empty result
@@ -65,6 +76,10 @@ Resolved from `add-transcript-summary`:
 
 ## Cross-links
 
+- [`provider_overrides.py`](provider_overrides.html) — the writable
+  `provider_overrides.json` overlay and the `apply_overrides` merge that
+  turns this file-only read into the effective provider list
 - [`summarize.py`](summarize.html) — consumes `Provider` for the backend call
+- [`model_discovery.py`](model_discovery.html) — live model discovery against a configured provider's `/models`
 - [`main.py`](main.html) — `GET /api/providers` (secret-free listing) and the per-request reads
-- [`errors.py`](errors.html) — `NOT_CONFIGURED` / `INVALID_PROVIDER`
+- [`errors.py`](errors.html) — `NOT_CONFIGURED` / `INVALID_PROVIDER` / `INVALID_MODEL` / `MODEL_NOT_REMOVABLE`

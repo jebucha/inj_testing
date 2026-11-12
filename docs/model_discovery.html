@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>app/model_discovery.py — inj-testing code docs</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<nav class="sidebar">
+<h1>inj-testing docs</h1>
+<ul>
+  <li><a href="index.html">index</a></li>
+  <li><a href="__init__.html">app/__init__.py</a></li>
+  <li><a href="main.html">app/main.py</a></li>
+  <li><a href="chain.html">app/chain.py</a></li>
+  <li><a href="fetchers.html">app/fetchers.py</a></li>
+  <li><a href="urls.html">app/urls.py</a></li>
+  <li><a href="errors.html">app/errors.py</a></li>
+  <li><a href="persist.html">app/persist.py</a></li>
+  <li><a href="library.html">app/library.py</a></li>
+  <li><a href="providers.html">app/providers.py</a></li>
+  <li><a href="summarize.html">app/summarize.py</a></li>
+  <li><a href="provider_overrides.html">app/provider_overrides.py</a></li>
+  <li><a href="model_discovery.html" aria-current="page">app/model_discovery.py</a></li>
+  <li><a href="settings.html">app/settings.py</a></li>
+  <li><a href="log.html">app/log.py</a></li>
+  <li><a href="logbus.html">app/logbus.py</a></li>
+  <li><a href="static/app-js.html">app/static/app.js</a></li>
+  <li><a href="static/index-html.html">app/static/index.html</a></li>
+  <li><a href="static/style-css.html">app/static/style.css</a></li>
+  <li><a href="deploy/Dockerfile.html">Dockerfile</a></li>
+  <li><a href="deploy/compose-yml.html">docker-compose.yml</a></li>
+  <li><a href="providers-json-example.html">providers.json.example</a></li>
+</ul>
+</nav>
+<main class="content">
+<h1><code>app/model_discovery.py</code> — model discovery</h1>
+<h2>Purpose</h2>
+<p>The backend call behind the model-management UI's "Refresh from backend"
+flow: an OpenAI-compatible <code>GET {baseURL}/models</code> request to a configured
+provider, returning the list of model ids. Discovery is <strong>advisory</strong> — the
+operator explicitly adds returned ids through the add endpoint, and a
+discovery failure never alters the effective model list. The HTTP dispatch
+lives in the module-level <code>_get_provider_models</code> seam (mirroring
+<code>summarize._call_chat_completions</code>) so the e2e harness can replace that
+function with a stub while <code>list_models</code> keeps running for real.</p>
+<h2>Public surface</h2>
+<ul>
+<li><code>list_models(provider, timeout=None) -&gt; list[str]</code> — the synchronous
+  call; meant to run in a worker thread (the dedicated discovery executor in
+  <code>main.py</code>).</li>
+<li><code>discovery_timeout() -&gt; float</code> — <code>MODEL_DISCOVERY_TIMEOUT</code> (default 15 s)
+  read at call time; non-numeric values fall back to the default.</li>
+<li><code>ModelDiscoveryError</code> — a failed /models call with machine-readable
+  <code>reason</code> (<code>unreachable</code>, <code>timeout</code>, <code>http_error</code>, <code>malformed_response</code>)
+  and a safe, app-constructed <code>detail</code>.</li>
+<li>Constants: <code>DEFAULT_DISCOVERY_TIMEOUT</code> (15.0), <code>MAX_DISCOVERED_MODELS</code>
+  (200).</li>
+</ul>
+<h2>Invariants</h2>
+<ul>
+<li><strong>No FastAPI imports.</strong> The call is a plain synchronous function, testable
+  directly against a stubbed seam.</li>
+<li><strong>Plain HTTP via <code>requests</code>, per-call <code>requests.get</code></strong> — no shared session
+  (thread-safe without locking), no SDK. The bearer token is attached only
+  when the provider defines an <code>apiKey</code>.</li>
+<li><strong>Advisory only.</strong> Discovery never writes: it surfaces ids for the UI to
+  add via <code>POST /api/providers/{provider_id}/models</code>. Rejected: auto-adding
+  every discovered model, so an unexpected backend cannot silently expand
+  the picker.</li>
+<li><strong>Secrets stay server-side.</strong> The response and every log event carry model
+  id strings only — never the base URL, API key, or response body. Exception
+  details are exception <em>type names</em> — <code>str()</code> of <code>requests</code> exceptions
+  embeds the URL, which must stay out of the logs.</li>
+<li><strong>Bounded, filtered parse.</strong> Only dict entries whose <code>id</code> is a non-empty
+  string are kept; duplicates are removed preserving order; the list is
+  capped at <code>MAX_DISCOVERED_MODELS</code> so a hostile or broken backend cannot
+  flood the response.</li>
+<li><strong>Dedicated bounded executor.</strong> Discovery runs on its own 2-worker pool in
+  <code>main.py</code> rather than the summarize pool: a 120 s summarize must not block
+  a fast /models call, and a hanging discovery must not starve
+  summarization.</li>
+<li><strong>The file config decides the target.</strong> The endpoint resolves the provider
+  against the <em>file</em> config (unknown id → 400 <code>INVALID_PROVIDER</code>,
+  backend-free); the overlay never changes which base URL is contacted.</li>
+<li><strong>Manual entry is the fallback.</strong> If a backend has no (or a
+  non-standard) <code>/models</code> endpoint, the UI's manual model-id entry always
+  works — discovery is a convenience, not the only path.</li>
+</ul>
+<h2>Log events emitted</h2>
+<ul>
+<li><code>provider_models_refreshed</code> (info): <code>provider</code>, <code>count</code>, <code>duration_ms</code>.</li>
+<li><code>provider_models_refresh_failed</code> (error): <code>provider</code>, <code>reason</code>, <code>detail</code>.</li>
+</ul>
+<h2>Error codes raised/handled</h2>
+<p>Raises <code>ProviderError</code> (502 <code>PROVIDER_ERROR</code>) when the call or the parse
+fails; handles <code>ModelDiscoveryError</code> internally. The endpoint also returns
+400 <code>INVALID_PROVIDER</code> for a provider id missing from the file config
+(backend-free, before any /models call).</p>
+<h2>Design decisions</h2>
+<p>From <code>add-summarization-model-management</code>:</p>
+<ul>
+<li><strong>D6</strong> — a separate FastAPI-free module with its own seam, timeout env,
+  failure taxonomy, and dedicated bounded executor; discovery is advisory
+  (the rejected-alternative note: no auto-adding of discovered models).</li>
+</ul>
+<h2>Cross-links</h2>
+<ul>
+<li><a href="providers.html"><code>providers.py</code></a> — the read-only file config that decides
+  which base URL is contacted</li>
+<li><a href="provider_overrides.html"><code>provider_overrides.py</code></a> — the add endpoint that
+  persists ids the UI adds from the discovery list</li>
+<li><a href="main.html"><code>main.py</code></a> — the <code>GET /api/providers/{provider_id}/available-models</code>
+  route and the dedicated discovery executor</li>
+<li><a href="summarize.html"><code>summarize.py</code></a> — the sibling backend module whose seam
+  and failure taxonomy this module mirrors</li>
+</ul>
+</main>
+</body>
+</html>

@@ -232,6 +232,24 @@ Every summarization is logged as `summary_completed` / `summary_failed`
 (structured logs and the in-browser log panel); a malformed config file
 logs `config_load_failed` and degrades to "not configured".
 
+**Model management.** The always-visible "Summarization models" section
+lists each configured provider with its model count and a Manage control.
+In the per-provider panel you can add a model id by hand, use
+"Refresh from backend" (an OpenAI-compatible `GET {baseURL}/models` call)
+to add models from the backend's own list, and remove models you added
+from the UI — config-file models cannot be removed here. UI additions live
+in a writable `provider_overrides.json` overlay in the transcripts
+directory (shape `{"<providerId>": ["model-id", ...]}`), layered over the
+read-only config file: the picker and the summarize endpoint accept
+overlay models exactly like file models, and a missing or malformed
+overlay simply degrades to "no additions". The overlay can never define a
+provider, a base URL, or an API key, so the trust model is unchanged: the
+app still only addresses operator-configured URLs (the SSRF surface is
+unchanged), and the new write endpoints are as unauthenticated as
+`POST /api/settings` — they can only change which model string is sent to
+an operator-approved backend, bounded by the id rules above. The UI is a
+convenience surface for a trusted LAN, not an admin surface.
+
 **Auto-summarize.** The Auto-summarize checkbox beside the provider picker
 enables hands-free summarizing: after a successful *fresh fetch* whose
 transcript has no saved summary, the app immediately sends it to the
@@ -254,6 +272,11 @@ HTTP error, sent a malformed response, or returned empty content (a thinking
 model can spend its whole output budget reasoning and produce nothing); please
 try again.
 `INPUT_TOO_LONG` 400 — the transcript exceeds the 100,000-character cap.
+`INVALID_MODEL` 400 — a model id entered in the model-management section
+violates the id rules (1–200 characters, no control characters, at most 50
+added models per provider).
+`MODEL_NOT_REMOVABLE` 400 — the model comes from the provider config file,
+so it cannot be removed from the UI (edit the config file instead).
 
 **A note on keys.** If a `baseURL` is not `localhost`/loopback and the
 provider carries an `apiKey`, use `https://` so the key does not cross the

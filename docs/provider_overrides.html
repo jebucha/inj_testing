@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>app/provider_overrides.py — inj-testing code docs</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<nav class="sidebar">
+<h1>inj-testing docs</h1>
+<ul>
+  <li><a href="index.html">index</a></li>
+  <li><a href="__init__.html">app/__init__.py</a></li>
+  <li><a href="main.html">app/main.py</a></li>
+  <li><a href="chain.html">app/chain.py</a></li>
+  <li><a href="fetchers.html">app/fetchers.py</a></li>
+  <li><a href="urls.html">app/urls.py</a></li>
+  <li><a href="errors.html">app/errors.py</a></li>
+  <li><a href="persist.html">app/persist.py</a></li>
+  <li><a href="library.html">app/library.py</a></li>
+  <li><a href="providers.html">app/providers.py</a></li>
+  <li><a href="summarize.html">app/summarize.py</a></li>
+  <li><a href="provider_overrides.html" aria-current="page">app/provider_overrides.py</a></li>
+  <li><a href="model_discovery.html">app/model_discovery.py</a></li>
+  <li><a href="settings.html">app/settings.py</a></li>
+  <li><a href="log.html">app/log.py</a></li>
+  <li><a href="logbus.html">app/logbus.py</a></li>
+  <li><a href="static/app-js.html">app/static/app.js</a></li>
+  <li><a href="static/index-html.html">app/static/index.html</a></li>
+  <li><a href="static/style-css.html">app/static/style.css</a></li>
+  <li><a href="deploy/Dockerfile.html">Dockerfile</a></li>
+  <li><a href="deploy/compose-yml.html">docker-compose.yml</a></li>
+  <li><a href="providers-json-example.html">providers.json.example</a></li>
+</ul>
+</nav>
+<main class="content">
+<h1><code>app/provider_overrides.py</code> — provider overrides store</h1>
+<h2>Purpose</h2>
+<p>The writable overlay for UI-added model ids: per-request read and atomic
+write of <code>provider_overrides.json</code> in the transcript directory, the pure
+merge of that overlay into a file-read provider config, and the
+read-modify-write add/remove operations behind the model-management
+endpoints. The overlay extends the model lists of providers defined in the
+read-only <code>providers.json</code> — it never introduces a provider, a base URL, or
+an API key.</p>
+<h2>Public surface</h2>
+<ul>
+<li><code>overrides_path() -&gt; Path</code> — <code>provider_overrides.json</code> in the transcript
+  directory, resolved at call time.</li>
+<li><code>load_overrides() -&gt; dict[str, list[str]]</code> — tolerant per-call read
+  (missing file → <code>{}</code>; unreadable/malformed → <code>{}</code> + one log event).</li>
+<li><code>apply_overrides(config, overrides) -&gt; ProviderConfig</code> — pure merge:
+  file models first, then non-duplicate overlay ids; the overlay ids
+  actually used are carried in <code>Provider.added_models</code>.</li>
+<li><code>add_model(provider_id, raw_model) -&gt; (model, effective models)</code> —
+  read-modify-write of an overlay addition under the module lock.</li>
+<li><code>remove_model(provider_id, raw_model) -&gt; (model, remaining models)</code> —
+  read-modify-write of an overlay removal under the module lock.</li>
+<li><code>validate_model_id(raw) -&gt; str | None</code> — the id rules, applied to the
+  trimmed value.</li>
+<li><code>ProviderOverridesWriteError</code> — the atomic write failed (already logged).</li>
+<li><code>ModelNotInOverlayError</code> — the id is in neither the config file nor the
+  overlay (the endpoint maps it to 404 <code>NOT_FOUND</code>).</li>
+<li>Bounds: <code>MAX_MODEL_ID_CHARS</code> (200), <code>MAX_ADDED_PER_PROVIDER</code> (50).</li>
+</ul>
+<h2>Invariants</h2>
+<ul>
+<li><strong>No FastAPI imports.</strong> Reader, merge, and writer are pure over
+  <code>persist.transcript_dir()</code> so they are testable directly against
+  <code>tmp_path</code>.</li>
+<li><strong>Overlay scope.</strong> The provider set comes only from the file config:
+  overlay keys for unknown providers are ignored (and left on disk). An
+  overlay can only extend a file provider's model list.</li>
+<li><strong>Merge order and provenance.</strong> Effective <code>models</code> are the file models in
+  order, followed by overlay ids not already present (first occurrence
+  wins); <code>added_models</code> carries exactly the overlay ids used, in the order
+  they appear in <code>models</code>, so the listing can expose them as removable.</li>
+<li><strong>Id rules.</strong> A model id is the trimmed value of a client string:
+  non-empty, at most <code>MAX_MODEL_ID_CHARS</code> characters, free of control
+  characters. Each provider holds at most <code>MAX_ADDED_PER_PROVIDER</code> overlay
+  additions.</li>
+<li><strong>Adding is idempotent.</strong> Re-adding an id already in the effective list
+  is a no-op (no write, no event, no duplicate). Removing targets overlay
+  ids only: a config-file model raises <code>ModelNotRemovableError</code>, an id in
+  neither set raises <code>ModelNotInOverlayError</code>.</li>
+<li><strong>Read per call, never cached.</strong> Edits on disk take effect on the next
+  request without a restart. A missing file is the normal "no additions"
+  state with <em>no</em> log entry.</li>
+<li><strong>Atomic writes, process-local lock.</strong> Read-modify-write runs under a
+  module-level lock; the write goes to a sibling temp file followed by
+  <code>os.replace</code> (the <code>settings.save_settings</code> pattern), so a crash mid-write
+  never leaves a truncated file. A single uvicorn process is the supported
+  deployment; multi-process coordination (an OS file lock) is a documented
+  non-goal.</li>
+<li><strong>The file is invisible to the transcript list.</strong> <code>list_transcripts()</code>
+  lists <code>.txt</code> files only, so <code>provider_overrides.json</code> never appears in
+  <code>GET /api/transcripts</code>.</li>
+</ul>
+<h2>Log events emitted</h2>
+<ul>
+<li><code>provider_overrides_load_failed</code> (error): <code>path</code>, <code>reason</code>
+  (<code>invalid_json</code>, <code>invalid_structure</code>, or the OS exception type name),
+  <code>detail</code> (the parse error — never file contents).</li>
+<li><code>provider_overrides_save_failed</code> (error): <code>path</code>, <code>reason</code>, <code>detail</code>.</li>
+<li><code>provider_model_added</code> (info): <code>provider</code>, <code>model</code>.</li>
+<li><code>provider_model_removed</code> (info): <code>provider</code>, <code>model</code>.</li>
+</ul>
+<p>No event carries an API key, a base URL, the transcript text, or the full
+model list.</p>
+<h2>Error codes raised/handled</h2>
+<p>Raises <code>InvalidModelError</code> (400 <code>INVALID_MODEL</code>, bad id or cap overflow),
+<code>InvalidProviderError</code> (400 <code>INVALID_PROVIDER</code>, defensive re-check of the
+provider against the file config), <code>ModelNotRemovableError</code> (400
+<code>MODEL_NOT_REMOVABLE</code>), <code>ModelNotInOverlayError</code> (endpoint maps to 404
+<code>NOT_FOUND</code>), and <code>ProviderOverridesWriteError</code> (endpoint maps to 500
+<code>WRITE_FAILED</code>).</p>
+<h2>Design decisions</h2>
+<p>From <code>add-summarization-model-management</code>:</p>
+<ul>
+<li><strong>D1</strong> — a separate writable overlay file, not a writable <code>providers.json</code>
+  (secret-bearing, read-only-mounted, operator-authored) and not an
+  extended <code>settings.json</code> (whose <code>save_settings</code> is a blind whole-file
+  overwrite).</li>
+<li><strong>D2</strong> — the effective config is file config plus overlay, with provenance
+  carried on <code>Provider.added_models</code>; the merge lives here, not in
+  <code>providers.py</code>, keeping the pure file reader single-purpose.</li>
+<li><strong>D3</strong> — read-modify-write under a module-level lock with atomic replace;
+  only overlay ids are removable.</li>
+<li><strong>D5</strong> — the validation and bounds live here, next to the store they
+  protect.</li>
+</ul>
+<h2>Cross-links</h2>
+<ul>
+<li><a href="providers.html"><code>providers.py</code></a> — the read-only file config this overlay
+  extends, and the <code>Provider</code> / <code>ProviderConfig</code> structures it merges</li>
+<li><a href="model_discovery.html"><code>model_discovery.py</code></a> — live model discovery
+  against a configured provider's <code>/models</code></li>
+<li><a href="main.html"><code>main.py</code></a> — the add/remove/discover endpoints and the
+  merged-config validation in <code>GET /api/providers</code> and <code>POST /api/summarize</code></li>
+<li><a href="settings.html"><code>settings.py</code></a> — the sibling writable-JSON pattern
+  (per-request read, temp file + <code>os.replace</code>)</li>
+<li><a href="persist.html"><code>persist.py</code></a> — <code>transcript_dir()</code>, where the overlay lives</li>
+</ul>
+</main>
+</body>
+</html>

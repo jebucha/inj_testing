@@ -495,6 +495,222 @@ h1 {
   font-size: 0.95rem;
 }
 
+/* --- Model management section --------------------------------------------------- */
+
+.model-management { margin-top: 24px; }
+
+.mm-title {
+  margin: 0 0 12px;
+  font-size: 1.15rem;
+}
+
+.mm-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.mm-provider-list {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.mm-provider-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.mm-provider-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 0.95rem;
+}
+
+.mm-provider-count {
+  color: var(--muted);
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.mm-manage-btn {
+  flex-shrink: 0;
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.mm-manage-btn:hover { background: rgba(47, 111, 237, 0.08); }
+
+.mm-manage-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.mm-panel {
+  padding: 12px 14px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.mm-panel:last-child { border-bottom: none; }
+
+.mm-add-form {
+  display: flex;
+  gap: 8px;
+}
+
+.mm-add-input {
+  flex: 1;
+  padding: 8px 12px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.mm-add-input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.mm-add-btn {
+  padding: 8px 16px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+}
+
+.mm-add-btn:hover:not(:disabled) { background: var(--accent-dark); }
+
+.mm-add-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.mm-refresh-btn {
+  margin-top: 10px;
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.mm-refresh-btn:hover:not(:disabled) { background: rgba(47, 111, 237, 0.08); }
+
+.mm-refresh-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.mm-discovered { margin-top: 12px; }
+
+.mm-discovered-title {
+  margin: 0 0 6px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.mm-discovered-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+}
+
+.mm-discovered-id {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 0.9rem;
+}
+
+.mm-discovered-add {
+  flex-shrink: 0;
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-size: 0.85rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.mm-discovered-add:hover:not(:disabled) { background: rgba(47, 111, 237, 0.08); }
+
+.mm-discovered-add:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.mm-models { margin-top: 12px; }
+
+.mm-models-title {
+  margin: 0 0 6px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.mm-model-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.mm-model-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+}
+
+.mm-model-id {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 0.9rem;
+}
+
+.mm-remove-btn {
+  flex-shrink: 0;
+  background: transparent;
+  color: var(--error-text);
+  border: 1px solid var(--error-border);
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-size: 0.85rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.mm-remove-btn:hover { background: var(--error-bg); }
+
+.mm-remove-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 /* --- Log viewer ---------------------------------------------------------------- */
 
 .log-panel {

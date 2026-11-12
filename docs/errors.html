@@ -21,6 +21,8 @@
   <li><a href="library.html">app/library.py</a></li>
   <li><a href="providers.html">app/providers.py</a></li>
   <li><a href="summarize.html">app/summarize.py</a></li>
+  <li><a href="provider_overrides.html">app/provider_overrides.py</a></li>
+  <li><a href="model_discovery.html">app/model_discovery.py</a></li>
   <li><a href="settings.html">app/settings.py</a></li>
   <li><a href="log.html">app/log.py</a></li>
   <li><a href="logbus.html">app/logbus.py</a></li>
@@ -111,6 +113,18 @@ and map it to the JSON envelope <code>{"error": {"code", "message"}}</code>.</p>
 <td><code>INPUT_TOO_LONG</code></td>
 <td>400</td>
 <td>transcript over the 100,000-character cap</td>
+</tr>
+<tr>
+<td><code>InvalidModelError</code></td>
+<td><code>INVALID_MODEL</code></td>
+<td>400</td>
+<td>model id violates the id rules (length, control chars) or the 50-addition cap</td>
+</tr>
+<tr>
+<td><code>ModelNotRemovableError</code></td>
+<td><code>MODEL_NOT_REMOVABLE</code></td>
+<td>400</td>
+<td>the model comes from the config file, not the overlay</td>
 </tr>
 </tbody>
 </table>

@@ -24,6 +24,8 @@ and map it to the JSON envelope `{"error": {"code", "message"}}`.
 | `InvalidPresetError` | `INVALID_PRESET` | 400 | preset id not in the server-side registry |
 | `ProviderError` | `PROVIDER_ERROR` | 502 | the summarization backend failed |
 | `InputTooLongError` | `INPUT_TOO_LONG` | 400 | transcript over the 100,000-character cap |
+| `InvalidModelError` | `INVALID_MODEL` | 400 | model id violates the id rules (length, control chars) or the 50-addition cap |
+| `ModelNotRemovableError` | `MODEL_NOT_REMOVABLE` | 400 | the model comes from the config file, not the overlay |
 
 Plus `FALLBACK_CODES` — the frozenset of codes for which the chain makes a
 fallback attempt: exactly `{"UPSTREAM_FAILURE"}`.

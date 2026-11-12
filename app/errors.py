@@ -124,5 +124,30 @@ class InputTooLongError(TranscriptError):
         return "This transcript is too long to summarize (over 100,000 characters)."
 
 
+class InvalidModelError(TranscriptError):
+    code = "INVALID_MODEL"
+    status = 400
+
+    @property
+    def default_message(self) -> str:
+        return (
+            "That model id is not valid — it must be 1 to 200 characters "
+            "without control characters, and each provider holds at most 50 "
+            "added models."
+        )
+
+
+class ModelNotRemovableError(TranscriptError):
+    code = "MODEL_NOT_REMOVABLE"
+    status = 400
+
+    @property
+    def default_message(self) -> str:
+        return (
+            "That model comes from the provider config file, so it cannot "
+            "be removed from the UI. Edit the config file instead."
+        )
+
+
 # Codes for which a fallback attempt is made (transient upstream problems only).
 FALLBACK_CODES = frozenset({"UPSTREAM_FAILURE"})

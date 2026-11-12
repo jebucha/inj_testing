@@ -21,6 +21,8 @@
   <li><a href="library.html">app/library.py</a></li>
   <li><a href="providers.html" aria-current="page">app/providers.py</a></li>
   <li><a href="summarize.html">app/summarize.py</a></li>
+  <li><a href="provider_overrides.html">app/provider_overrides.py</a></li>
+  <li><a href="model_discovery.html">app/model_discovery.py</a></li>
   <li><a href="settings.html">app/settings.py</a></li>
   <li><a href="log.html">app/log.py</a></li>
   <li><a href="logbus.html">app/logbus.py</a></li>
@@ -45,7 +47,9 @@ structure of usable providers plus the default provider id, or the empty
 <li><code>config_path() -&gt; Path</code> — resolves <code>PROVIDERS_CONFIG</code> (default
   <code>providers.json</code> in the working directory) at call time.</li>
 <li><code>Provider</code> — frozen dataclass: <code>id</code>, <code>name</code> (display, falls back to the
-  id), <code>base_url</code>, <code>api_key</code> (optional), <code>models</code> (tuple of ids, file order).</li>
+  id), <code>base_url</code>, <code>api_key</code> (optional), <code>models</code> (tuple of ids, file
+  order), and <code>added_models</code> (tuple, empty on a file read — populated only
+  by the overlay merge in <code>provider_overrides.apply_overrides</code>).</li>
 <li><code>ProviderConfig</code> — frozen dataclass: <code>providers</code> (tuple) + <code>default</code>
   (id or <code>None</code>).</li>
 </ul>
@@ -56,6 +60,15 @@ structure of usable providers plus the default provider id, or the empty
 <li><strong>Read per call, never cached, never at startup.</strong> Edits take effect on
   the next request without a restart, and the app boots with no config at
   all.</li>
+<li><strong>The config file is operator-owned and read-only, by contract.</strong> This
+  module never writes it. Models added through the UI live in a separate
+  writable overlay, <code>provider_overrides.json</code> in the transcript directory
+  (owned by <a href="provider_overrides.html"><code>provider_overrides.py</code></a>); the overlay
+  can only extend the model lists of providers defined in this file — never
+  introduce a provider, a base URL, or an API key. The effective provider
+  list is the file providers/models followed by the overlay's non-duplicate
+  additions, composed by <code>provider_overrides.apply_overrides</code> at the
+  endpoints, so <code>load_providers()</code> itself stays file-only.</li>
 <li><strong>Missing file is the normal "not configured" state</strong> — an empty result
   with <em>no</em> log entry. An unreadable file, malformed JSON, a malformed
   structure, or a file with no usable provider all return the empty result
@@ -94,9 +107,13 @@ endpoint turns that into <code>NOT_CONFIGURED</code> 503.</p>
 </ul>
 <h2>Cross-links</h2>
 <ul>
+<li><a href="provider_overrides.html"><code>provider_overrides.py</code></a> — the writable
+  <code>provider_overrides.json</code> overlay and the <code>apply_overrides</code> merge that
+  turns this file-only read into the effective provider list</li>
 <li><a href="summarize.html"><code>summarize.py</code></a> — consumes <code>Provider</code> for the backend call</li>
+<li><a href="model_discovery.html"><code>model_discovery.py</code></a> — live model discovery against a configured provider's <code>/models</code></li>
 <li><a href="main.html"><code>main.py</code></a> — <code>GET /api/providers</code> (secret-free listing) and the per-request reads</li>
-<li><a href="errors.html"><code>errors.py</code></a> — <code>NOT_CONFIGURED</code> / <code>INVALID_PROVIDER</code></li>
+<li><a href="errors.html"><code>errors.py</code></a> — <code>NOT_CONFIGURED</code> / <code>INVALID_PROVIDER</code> / <code>INVALID_MODEL</code> / <code>MODEL_NOT_REMOVABLE</code></li>
 </ul>
 </main>
 </body>
