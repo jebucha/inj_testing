@@ -24,9 +24,14 @@ third-party transcript service.
   read endpoints add `INVALID_NAME` 400 and `NOT_FOUND` 404; summarization
   adds `NOT_CONFIGURED` 503, `INVALID_PROVIDER` 400, `PROVIDER_ERROR` 502,
   and `INPUT_TOO_LONG` 400; the injection benchmark's non-persisting
-  `POST /api/llm-call` endpoint adds `INVALID_PRESET` 400.
+  `POST /api/llm-call` endpoint adds `INVALID_PRESET` 400. Any request whose
+  `Content-Length` exceeds 5 MiB is rejected before parsing with 413
+  `BODY_TOO_LARGE`, regardless of route.
 - **Concurrency:** at most one YouTube fetch chain at a time; a second
-  concurrent request gets `503 BUSY` immediately.
+  concurrent request gets `503 BUSY` immediately. Summarization backend
+  calls are separately bounded to 2 concurrent (a dedicated thread pool;
+  excess summarize requests wait for a slot), and the server caps
+  concurrent connections at 100 (uvicorn rejects beyond that with 503).
 
 ## Build and run
 
@@ -221,7 +226,10 @@ Keep your real file elsewhere (e.g.
 
 **Behavior and limits.** Summarization runs independently of the
 transcript fetch chain (it is not subject to the single-flight `BUSY`
-limit). The transcript must be at most 100,000 characters (`INPUT_TOO_LONG`
+limit), but at most 2 summarization backend calls run concurrently —
+extra requests wait for a free slot in a dedicated thread pool, so slow
+models cannot starve the other endpoints. The transcript must be at most
+100,000 characters (`INPUT_TOO_LONG`
 above that) and the output is bounded to 16384 tokens; if the model's context
 window is smaller than the transcript, the backend's HTTP error surfaces as
 `PROVIDER_ERROR`. A successful summary is saved as `<name>.summary` next to
@@ -393,19 +401,22 @@ uv run python -m app.main                      # http://localhost:8000
 ## Layout
 
 ```
-app/            FastAPI application
-  main.py       app factory, lifecycle + request logging, API endpoints
-  chain.py      fetch-chain orchestration (single-flight semaphore, attempt logging)
-  fetchers.py   primary (youtube-transcript-api) + fallback (yt-dlp) + text cleaning
-  urls.py       YouTube URL/ID parsing (no network)
-  errors.py     error taxonomy (code + HTTP status + message)
-  persist.py    title-to-file-name derivation + best-effort transcript writer
-  library.py    read side of saved transcripts (list + read)
-  providers.py  summarization provider config (read per request)
-  summarize.py  provider invocation + summary file save/read
-  log.py        structlog JSON-to-stdout setup
-  logbus.py     in-memory ring buffer backing the SSE log viewer
-  static/       index.html, style.css, app.js (no build step, no CDN)
+app/                      FastAPI application
+  main.py                 app factory, lifecycle + request logging, API endpoints
+  chain.py                fetch-chain orchestration (single-flight semaphore, attempt logging)
+  fetchers.py             primary (youtube-transcript-api) + fallback (yt-dlp) + text cleaning
+  urls.py                 YouTube URL/ID parsing (no network)
+  errors.py               error taxonomy (code + HTTP status + message)
+  persist.py              title-to-file-name derivation + best-effort transcript writer
+  library.py              read side of saved transcripts (list + read)
+  providers.py            summarization provider config (read per request)
+  provider_overrides.py   writable overlay for UI-added models (provider_overrides.json)
+  model_discovery.py      live model discovery from a provider's /models endpoint
+  summarize.py            provider invocation + summary file save/read
+  settings.py             app settings persistence (settings.json in the transcripts dir)
+  log.py                  structlog JSON-to-stdout setup
+  logbus.py               in-memory ring buffer backing the SSE log viewer
+  static/                 index.html, style.css, app.js (no build step, no CDN)
 tests/          unit/API/logging tests + tests/e2e (Playwright, dev-only)
 docs/           per-file code documentation (open docs/index.html in a browser)
 ```
