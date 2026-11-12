@@ -3,7 +3,7 @@
 ## Purpose
 
 An example JSON configuration file that defines one or more summarization providers
-for the yt-transcript app. Mounted read-only at `/app/providers.json` inside the
+for the inj-testing app. Mounted read-only at `/app/providers.json` inside the
 Docker container (see docker-compose.yml), it tells the app which backend to send
 transcripts through for summarization and how to address each provider's API.
 

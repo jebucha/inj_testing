@@ -252,7 +252,7 @@ def fallback_fetch(video_id: str, requested_language: str = "en") -> tuple[str, 
 
     Returns ``(text, language_code, title)``.
     """
-    with tempfile.TemporaryDirectory(prefix="yt-transcript-") as outdir:
+    with tempfile.TemporaryDirectory(prefix="inj-testing-") as outdir:
         try:
             info = _extract_subtitles(
                 video_id,

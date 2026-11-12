@@ -1,4 +1,4 @@
-# yt-transcript
+# inj-testing
 
 A small, self-hosted tool that turns a pasted YouTube URL into a plain-text
 transcript with a single "copy to clipboard" action. One lightweight
@@ -37,10 +37,22 @@ docker compose up -d --build
 ```
 
 `docker-compose.yml` declares everything: the image build, the fixed
-container name (`yt-transcript`), the `unless-stopped` restart policy, the
+container name (`inj-testing`), the `unless-stopped` restart policy, the
 port mapping, a bind mount for transcript storage, a healthcheck, and
 container log rotation. After startup the container reports healthy via
-`docker compose ps`; inspect output with `docker logs yt-transcript`.
+`docker compose ps`; inspect output with `docker logs inj-testing`.
+
+**One-time migration from the old `yt-transcript` name.** If you already
+have a deployment, compose will create the new `inj-testing` container
+and leave your old `yt-transcript` container orphaned (unmanaged). Remove
+it first — both publish the same host port (`${PORT:-8000}`), so the new
+container cannot start while the old one is running:
+
+```sh
+docker rm -f yt-transcript        # or: podman rm -f yt-transcript
+```
+
+Then rebuild and start with `docker compose up -d --build` as above.
 
 **Optional host-port override.** Drop an uncommitted `.env` file (git-
 ignored) next to the compose file containing e.g. `PORT=9000`, then re-run
@@ -83,14 +95,14 @@ If you have no compose tooling, the raw build + run path still works:
 
 ```sh
 # Docker
-docker build -t yt-transcript .
-docker run -d --name yt-transcript --restart unless-stopped -p 8000:8000 yt-transcript
+docker build -t inj-testing .
+docker run -d --name inj-testing --restart unless-stopped -p 8000:8000 inj-testing
 ```
 
 ```sh
 # Podman
-podman build -t yt-transcript .
-podman run -d --name yt-transcript --restart unless-stopped -p 8000:8000 yt-transcript
+podman build -t inj-testing .
+podman run -d --name inj-testing --restart unless-stopped -p 8000:8000 inj-testing
 ```
 
 The listen port can be overridden with the `PORT` environment variable
@@ -131,7 +143,7 @@ curl -s -X POST http://127.0.0.1:8000/api/transcript \
 # -> 400 {"error": {"code": "INVALID_URL", "message": ...}}
 
 # 5) The structured logs
-docker logs yt-transcript        # or: podman logs yt-transcript
+docker logs inj-testing        # or: podman logs inj-testing
 #    -> a "transcript_saved" event with the file path and byte count
 
 # 6) The in-browser log stream (server-sent events)
@@ -196,14 +208,14 @@ re-read on every request, so edits take effect without a restart. Shape:
 | `SUMMARY_TIMEOUT` | the app | `120` | backend-call timeout in seconds (connect + read), sized for local 27B-class models; raise it for slower hardware |
 
 With compose, the host-side config path is overridable through the
-uncommitted `.env` file: `PROVIDERS_CONFIG=/etc/yt-transcript/providers.json`
+uncommitted `.env` file: `PROVIDERS_CONFIG=/etc/inj-testing/providers.json`
 bind-mounts that host file to the fixed container path `/app/providers.json`
 (read-only).
 
 **Keeping a key-bearing config out of git.** `providers.json` is
 git-ignored; the committed `providers.json.example` is a keyless sample.
 Keep your real file elsewhere (e.g.
-`/etc/yt-transcript/providers.json`) and point the host-side
+`/etc/inj-testing/providers.json`) and point the host-side
 `PROVIDERS_CONFIG` at it from `.env` (git-ignored) — or, for local dev, set
 `PROVIDERS_CONFIG` in the shell when running `uv run python -m app.main`.
 
@@ -332,10 +344,10 @@ Then:
 1. Commit the refreshed `pyproject.toml` and `uv.lock` (both are rewritten in
    one step — the diff is the reviewable change, and the pins stay exact).
 2. Rebuild and re-run:
-   `docker build -t yt-transcript .` followed by
-   `docker rm -f yt-transcript && docker run -d --name yt-transcript --restart unless-stopped -p 8000:8000 yt-transcript`
+   `docker build -t inj-testing .` followed by
+   `docker rm -f inj-testing && docker run -d --name inj-testing --restart unless-stopped -p 8000:8000 inj-testing`
    (podman equivalents).
-3. Re-run the smoke test above and check `docker logs yt-transcript` for
+3. Re-run the smoke test above and check `docker logs inj-testing` for
    `fetch_attempt` lines with `"outcome": "success"`.
 
 ## Development

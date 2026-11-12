@@ -6,6 +6,7 @@ providers.json
 providers.json.bk
 .claude/
 .opencode/
+.agents/
 
 # Python
 __pycache__/

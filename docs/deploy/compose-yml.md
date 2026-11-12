@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The Compose file that turns a local or VPS checkout into a running yt-transcript
+The Compose file that turns a local or VPS checkout into a running inj-testing
 instance in one command (`docker compose up -d --build`). Single service, no
 profiles, no build args — deliberately scoped to the subset supported by both
 Docker Compose v2 and podman-compose for parity.
@@ -10,8 +10,8 @@ Docker Compose v2 and podman-compose for parity.
 ## Public surface
 
 - **Service name:** `app` (the only service)
-- **Container image:** `yt-transcript` (built from `./`)
-- **Container name:** `yt-transcript` (fixed, matches non-compose usage)
+- **Container image:** `inj-testing` (built from `./`)
+- **Container name:** `inj-testing` (fixed, matches non-compose usage)
 - **Host-side knobs** (via uncommitted `.env` file):
 
   | Variable | Default | Maps to | Notes |
@@ -34,7 +34,7 @@ Docker Compose v2 and podman-compose for parity.
   container paths must update both the volume mount *and* healthcheck address.
 - **`.env` never committed.** It contains machine-local overrides; tracked in
   `.gitignore` (`.env`).
-- **Single-instance only.** The fixed `container_name: yt-transcript` means two
+- **Single-instance only.** The fixed `container_name: inj-testing` means two
   compose projects on one host cannot coexist — acceptable for a single-user
   self-hosted tool.
 - **Read-only config mount.** `/app/providers.json` is mounted `ro`; the app's

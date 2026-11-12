@@ -249,7 +249,7 @@ def test_root_serves_ui(page, server):
     assert page.locator("#fetch-btn").count() == 1
     assert page.locator("#transcript-panel").count() == 1
     assert page.locator("#copy-btn").count() == 1
-    assert page.title() == "YouTube Transcript"
+    assert page.title() == "inj-testing"
     assert external == [], f"external network resources referenced: {external}"
 
 

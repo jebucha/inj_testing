@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The build definition for the yt-transcript container image: a single-stage
+The build definition for the inj-testing container image: a single-stage
 image (~251 MB as measured on arm64; size varies by architecture) built from
 `astral/uv:python3.13-bookworm-slim`, running the app as an unprivileged user
 with no dev dependencies installed. Designed

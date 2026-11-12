@@ -1,4 +1,4 @@
-# yt-transcript — code documentation
+# inj-testing — code documentation
 
 Per-file documentation for every file in `app/`, plus deployment configs
 (`Dockerfile`, `docker-compose.yml`) and the provider configuration template.

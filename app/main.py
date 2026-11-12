@@ -110,7 +110,7 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="yt-transcript", lifespan=lifespan)
+    app = FastAPI(title="inj-testing", lifespan=lifespan)
     applog.install_excepthook()
 
     # Registered before the logging middleware (Starlette applies the

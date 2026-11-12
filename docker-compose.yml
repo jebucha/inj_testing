@@ -1,4 +1,4 @@
-# yt-transcript — single service, plain compose v2.
+# inj-testing — single service, plain compose v2.
 # No `version:` key (obsolete in v2), no profiles, no build args: the file
 # stays inside the key set that both `docker compose` and `podman compose`
 # / podman-compose support (see design.md, decision 4).
@@ -6,8 +6,8 @@
 services:
   app:
     build: .
-    image: yt-transcript
-    container_name: yt-transcript
+    image: inj-testing
+    container_name: inj-testing
     restart: unless-stopped
     ports:
       # Host port is overridable via an uncommitted .env file (e.g. PORT=9000);
@@ -24,7 +24,7 @@ services:
       - "${TRANSCRIPTS_DIR:-/home/john/transcripts}:/transcripts"
       # The summarization provider config (JSON). The host side is
       # overridable via an uncommitted .env file (e.g.
-      # PROVIDERS_CONFIG=/etc/yt-transcript/providers.json), pointing at a
+      # PROVIDERS_CONFIG=/etc/inj-testing/providers.json), pointing at a
       # real, key-bearing file kept out of git; the container side is fixed
       # at the working-directory default (the app reads PROVIDERS_CONFIG
       # inside the container, defaulting to the cwd's providers.json).
@@ -34,13 +34,16 @@ services:
       # Probes the UI route with python — the astral/uv base image has no
       # curl, and no dedicated /health endpoint is added (design.md,
       # decision 2). urlopen raises on any 4xx/5xx, so a degraded app
-      # fails the probe.
+      # fails the probe. The CMD-SHELL (string) form is used instead of the
+      # exec CMD array because the podman-compose provider re-serializes the
+      # exec form into a broken shell string; the shell form passes through
+      # verbatim under both docker and podman-compose.
       # The hardcoded 127.0.0.1:8000 is correct precisely because of the
       # port decoupling above: the container always listens on 8000, so the
       # probe does not need to track ${PORT}. If the container-side port in
       # the mapping above is ever changed or re-coupled, update this address
       # to match.
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/')"]
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://127.0.0.1:8000/\")'"]
       interval: 30s
       timeout: 5s
       retries: 3

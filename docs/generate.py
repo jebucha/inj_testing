@@ -54,12 +54,12 @@ PAGE_TEMPLATE = """<!DOCTYPE html>
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>{title} — yt-transcript code docs</title>
+<title>{title} — inj-testing code docs</title>
 <link rel="stylesheet" href="{css}" />
 </head>
 <body>
 <nav class="sidebar">
-<h1>yt-transcript docs</h1>
+<h1>inj-testing docs</h1>
 <ul>
 {nav}
 </ul>

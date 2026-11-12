@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>docker-compose.yml — yt-transcript code docs</title>
+<title>docker-compose.yml — inj-testing code docs</title>
 <link rel="stylesheet" href="../style.css" />
 </head>
 <body>
 <nav class="sidebar">
-<h1>yt-transcript docs</h1>
+<h1>inj-testing docs</h1>
 <ul>
   <li><a href="../index.html">index</a></li>
   <li><a href="../__init__.html">app/__init__.py</a></li>
@@ -35,15 +35,15 @@
 <main class="content">
 <h1><code>docker-compose.yml</code> — declarative single-service deployment</h1>
 <h2>Purpose</h2>
-<p>The Compose file that turns a local or VPS checkout into a running yt-transcript
+<p>The Compose file that turns a local or VPS checkout into a running inj-testing
 instance in one command (<code>docker compose up -d --build</code>). Single service, no
 profiles, no build args — deliberately scoped to the subset supported by both
 Docker Compose v2 and podman-compose for parity.</p>
 <h2>Public surface</h2>
 <ul>
 <li><strong>Service name:</strong> <code>app</code> (the only service)</li>
-<li><strong>Container image:</strong> <code>yt-transcript</code> (built from <code>./</code>)</li>
-<li><strong>Container name:</strong> <code>yt-transcript</code> (fixed, matches non-compose usage)</li>
+<li><strong>Container image:</strong> <code>inj-testing</code> (built from <code>./</code>)</li>
+<li><strong>Container name:</strong> <code>inj-testing</code> (fixed, matches non-compose usage)</li>
 <li><strong>Host-side knobs</strong> (via uncommitted <code>.env</code> file):</li>
 </ul>
 <table>
@@ -91,7 +91,7 @@ Docker Compose v2 and podman-compose for parity.</p>
   container paths must update both the volume mount <em>and</em> healthcheck address.</li>
 <li><strong><code>.env</code> never committed.</strong> It contains machine-local overrides; tracked in
   <code>.gitignore</code> (<code>.env</code>).</li>
-<li><strong>Single-instance only.</strong> The fixed <code>container_name: yt-transcript</code> means two
+<li><strong>Single-instance only.</strong> The fixed <code>container_name: inj-testing</code> means two
   compose projects on one host cannot coexist — acceptable for a single-user
   self-hosted tool.</li>
 <li><strong>Read-only config mount.</strong> <code>/app/providers.json</code> is mounted <code>ro</code>; the app's

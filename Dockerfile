@@ -1,4 +1,4 @@
-# yt-transcript — single-stage image, podman-compatible.
+# inj-testing — single-stage image, podman-compatible.
 # Final size: ~251 MB measured (podman build, arm64).
 FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim
 
