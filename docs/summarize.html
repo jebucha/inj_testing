@@ -37,10 +37,13 @@
 <h2>Purpose</h2>
 <p>The summarization feature's backend: an OpenAI-compatible
 chat-completions call to a configured provider/model, plus save/read of the
-result as a <code>.summary</code> file next to the transcript. The HTTP dispatch lives
-in the module-level <code>_call_chat_completions</code> so the e2e harness can replace
-that function with a recording stub while <code>summarize_with_provider</code> keeps
-running for real.</p>
+result as a <code>.summary</code> file next to the transcript. It also hosts the
+injection benchmark's two server-side pieces — the system-prompt preset
+registry and the non-persisting <code>call_with_preset</code> — since the registry's
+<code>summarize</code> preset <em>is</em> the fixed <code>SUMMARY_INSTRUCTION</code> and the call
+reuses the same dispatch. The HTTP dispatch lives in the module-level
+<code>_call_chat_completions</code> so the e2e harness can replace that function with
+a recording stub while <code>summarize_with_provider</code> keeps running for real.</p>
 <h2>Public surface</h2>
 <ul>
 <li><code>summarize_with_provider(provider, model, text, timeout=None) -&gt; str</code> —
@@ -52,12 +55,22 @@ running for real.</p>
   <code>&lt;name&gt;.summary</code>.</li>
 <li><code>summary_timeout() -&gt; float</code> — <code>SUMMARY_TIMEOUT</code> (default 120 s) read at
   call time; non-numeric values fall back to the default.</li>
+<li><code>call_with_preset(provider, model, preset_id, text, timeout=None) -&gt; str</code>
+  — the injection benchmark's non-persisting call: builds
+  <code>[system: &lt;preset text&gt;, user: text]</code>, reuses the dispatch, returns the
+  model's output, and never writes a file.</li>
+<li><code>resolve_preset(preset_id) -&gt; str</code> — the preset registry resolver;
+  raises <code>InvalidPresetError</code> (400 <code>INVALID_PRESET</code>) for an unknown id.</li>
+<li><code>PRESETS</code> — the server-side system-prompt preset registry:
+  <code>summarize</code> → <code>SUMMARY_INSTRUCTION</code>, <code>judge</code> → <code>JUDGE_INSTRUCTION</code>.</li>
 <li><code>ProviderCallError</code> — a failed backend call with machine-readable
   <code>reason</code> (<code>unreachable</code>, <code>timeout</code>, <code>http_error</code>, <code>malformed_response</code>,
   <code>empty_response</code>) and a safe, app-constructed <code>detail</code>.</li>
 <li>Constants: <code>MAX_OUTPUT_TOKENS</code> (16384), <code>MAX_INPUT_CHARS</code> (100,000),
   <code>DEFAULT_SUMMARY_TIMEOUT</code> (120.0), <code>SUMMARY_INSTRUCTION</code> (the fixed,
-  server-side prompt), <code>SUMMARY_EXTENSION</code> (<code>.summary</code>).</li>
+  server-side summarization prompt), <code>JUDGE_INSTRUCTION</code> (the fixed,
+  server-side judge prompt: first line exactly <code>resisted</code> / <code>partial</code> /
+  <code>full</code>, then a brief reason), <code>SUMMARY_EXTENSION</code> (<code>.summary</code>).</li>
 </ul>
 <h2>Invariants</h2>
 <ul>
@@ -78,6 +91,17 @@ running for real.</p>
 <li><strong>Caps:</strong> input over 100,000 chars is rejected upstream
   (<code>INPUT_TOO_LONG</code>); output is bounded server-side at <code>max_tokens=16384</code>
   — sized so reasoning plus a full summary both fit.</li>
+<li><strong>System prompts come only from the server-side preset registry.</strong>
+  <code>call_with_preset</code> resolves the system prompt via <code>resolve_preset</code>
+  (<code>summarize</code> / <code>judge</code> in v1); the benchmark endpoint accepts a preset
+  <em>id</em>, never client-supplied prompt text — with the app unauthenticated
+  on <code>0.0.0.0</code>, that is the line that keeps arbitrary LAN peers from
+  driving the configured backends with arbitrary prompts. Testing a
+  defense later is a matter of registering a new defensive preset.</li>
+<li><strong><code>call_with_preset</code> never persists.</strong> It is the injection
+  benchmark's delivery <em>and</em> judge primitive (one primitive, two
+  callers): the route it serves writes no file, so benchmark runs
+  cannot pollute the transcript directory by construction.</li>
 <li><strong>Save is best-effort and never raises;</strong> a failure is only the
   <code>summary_save_failed</code> event. Overwriting on re-summarize is intended.</li>
 <li><strong>Read follows the read-side discipline</strong> of <code>library.read_transcript</code>:
@@ -91,11 +115,16 @@ running for real.</p>
 <li><code>summary_failed</code> (error): <code>provider</code>, <code>model</code>, <code>duration_ms</code>, <code>reason</code>,
   <code>detail</code>.</li>
 <li><code>summary_save_failed</code> (error): <code>name</code>, <code>path</code>, <code>reason</code>, <code>detail</code>.</li>
+<li><code>llm_call_completed</code> (info): <code>provider</code>, <code>model</code>, <code>preset</code>,
+  <code>duration_ms</code>, <code>chars_in</code>, <code>chars_out</code>.</li>
+<li><code>llm_call_failed</code> (error): <code>provider</code>, <code>model</code>, <code>preset</code>, <code>duration_ms</code>,
+  <code>reason</code>, <code>detail</code>.</li>
 </ul>
 <h2>Error codes raised/handled</h2>
 <p>Raises <code>ProviderError</code> (502 <code>PROVIDER_ERROR</code>, message includes the
-machine-readable reason) when the backend call fails; handles
-<code>ProviderCallError</code> internally.</p>
+machine-readable reason) when a backend call fails and
+<code>InvalidPresetError</code> (400 <code>INVALID_PRESET</code>) for an unknown preset id;
+handles <code>ProviderCallError</code> internally.</p>
 <h2>Design decisions</h2>
 <p>Resolved from <code>add-transcript-summary</code>:</p>
 <ul>
@@ -111,10 +140,24 @@ machine-readable reason) when the backend call fails; handles
   <code>_call_chat_completions</code> so the log emission still runs under stubs.</li>
 <li><strong>decision 13</strong> — the logging fields and the never-log-secrets rule.</li>
 </ul>
+<p>From <code>add-prompt-injection-benchmark</code>:</p>
+<ul>
+<li><strong>decision 2</strong> — the non-persisting preset-driven endpoint: the
+  benchmark does not call <code>POST /api/summarize</code> (which persists);
+  delivery (<code>summarize</code> preset) and judge (<code>judge</code> preset) both call
+  <code>POST /api/llm-call</code> over <code>call_with_preset</code>, so <code>.summary</code> pollution
+  is impossible by construction.</li>
+<li><strong>decision 3</strong> — the system prompt is a server-side preset id, not
+  client text (the unauthenticated-LAN rationale).</li>
+<li><strong>decision 5</strong> — the layered oracle; this module only supplies the
+  judge preset's prompt shape (first line <code>resisted</code> / <code>partial</code> /
+  <code>full</code>, then a brief reason).</li>
+</ul>
 <h2>Cross-links</h2>
 <ul>
 <li><a href="providers.html"><code>providers.py</code></a> — the config that supplies the <code>Provider</code></li>
-<li><a href="main.html"><code>main.py</code></a> — the bounded executor and validation order</li>
+<li><a href="main.html"><code>main.py</code></a> — the bounded executor, the validation order, and
+  the <code>POST /api/llm-call</code> route over <code>call_with_preset</code></li>
 <li><a href="library.html"><code>library.py</code></a> — the read-side discipline <code>read_summary</code> mirrors</li>
 <li><a href="persist.html"><code>persist.py</code></a> — the sibling writer in the same directory</li>
 </ul>

@@ -94,6 +94,18 @@ class InvalidProviderError(TranscriptError):
         )
 
 
+class InvalidPresetError(TranscriptError):
+    code = "INVALID_PRESET"
+    status = 400
+
+    @property
+    def default_message(self) -> str:
+        return (
+            "Unknown preset — it is not registered server-side. "
+            "Reload the page and try again."
+        )
+
+
 class ProviderError(TranscriptError):
     code = "PROVIDER_ERROR"
     status = 502

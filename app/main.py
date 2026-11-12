@@ -23,6 +23,7 @@ from app import logbus
 from app import summarize as summarize_mod
 from app.errors import (
     InputTooLongError,
+    InvalidPresetError,
     InvalidProviderError,
     SummaryNotConfiguredError,
     TranscriptError,
@@ -69,6 +70,18 @@ class TranscriptRequest(BaseModel):
 class SummarizeRequest(BaseModel):
     text: str = ""  # the displayed transcript (source of truth, design 4)
     name: str = ""  # the transcript's file name (for the alongside save)
+    provider: str = ""
+    model: str = ""
+
+
+class LlmCallRequest(BaseModel):
+    # The non-persisting preset-driven provider call
+    # (prompt-injection-benchmark). The system prompt comes only from the
+    # server-side preset registry via `preset`; the model deliberately
+    # defines no system-prompt field, so any client-supplied one is ignored
+    # (pydantic drops unknown fields).
+    text: str = ""
+    preset: str = ""
     provider: str = ""
     model: str = ""
 
@@ -339,6 +352,65 @@ def create_app() -> FastAPI:
         # (design decision 6).
         await asyncio.to_thread(summarize_mod.save_summary, request.name, summary)
         return {"summary": summary}
+
+    @app.post("/api/llm-call")
+    async def llm_call_endpoint(request: LlmCallRequest):
+        # The injection benchmark's non-persisting provider call: the system
+        # prompt comes only from the server-side preset registry, the result
+        # is returned as `text`, and this route never creates or modifies a
+        # file. Local rejection order (all backend-free, first failing step
+        # wins): invalid preset -> not configured -> unknown provider/model
+        # -> overlong text.
+        try:
+            summarize_mod.resolve_preset(request.preset)
+        except InvalidPresetError as exc:
+            return JSONResponse(
+                status_code=exc.status,
+                content={"error": {"code": exc.code,
+                                   "message": exc.message}},
+            )
+        config = await asyncio.to_thread(load_providers)
+        if not config.providers:
+            error = SummaryNotConfiguredError()
+            return JSONResponse(
+                status_code=error.status,
+                content={"error": {"code": error.code,
+                                   "message": error.message}},
+            )
+        provider = next(
+            (p for p in config.providers if p.id == request.provider), None
+        )
+        if provider is None or request.model not in provider.models:
+            error = InvalidProviderError()
+            return JSONResponse(
+                status_code=error.status,
+                content={"error": {"code": error.code,
+                                   "message": error.message}},
+            )
+        if len(request.text) > summarize_mod.MAX_INPUT_CHARS:
+            error = InputTooLongError()
+            return JSONResponse(
+                status_code=error.status,
+                content={"error": {"code": error.code,
+                                   "message": error.message}},
+            )
+        # Shared bounded pool with summarization (the same 2-worker cap),
+        # same run_in_executor + copied-context pattern: the benchmark adds
+        # no new unbounded-LLM surface. ProviderError (PROVIDER_ERROR 502)
+        # and friends surface via the TranscriptError mapping.
+        try:
+            text = await asyncio.get_running_loop().run_in_executor(
+                SUMMARIZE_EXECUTOR,
+                contextvars.copy_context().run,
+                summarize_mod.call_with_preset,
+                provider, request.model, request.preset, request.text,
+            )
+        except TranscriptError as exc:
+            return JSONResponse(
+                status_code=exc.status,
+                content={"error": {"code": exc.code, "message": exc.message}},
+            )
+        return {"text": text}
 
     @app.get("/api/logs")
     async def log_stream_endpoint():

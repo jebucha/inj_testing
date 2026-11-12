@@ -47,6 +47,9 @@ app/persist.py  save_transcript   best-effort, worker thread
   |  POST /api/summarize             app/summarize.py - backend call,
   |                                  app/providers.py config read per request,
   |                                  dedicated 2-worker executor
+  |  POST /api/llm-call              app/summarize.py - preset-driven
+  |                                  non-persisting backend call (the
+  |                                  injection benchmark), same executor
   |
   |  GET /api/providers              app/providers.py - secret-free listing
   |  GET /api/settings               app/settings.py  - read (off-default)
@@ -55,7 +58,7 @@ app/persist.py  save_transcript   best-effort, worker thread
   v
 app/log.py  structlog: one JSON object per line -> stdout
   (every module's events: server_*, http_request, fetch_*, *_saved,
-   summary_*, config_load_failed, settings_load_failed,
+   summary_*, llm_call_*, config_load_failed, settings_load_failed,
    settings_save_failed, unhandled_exception)
 
 app/errors.py - code + HTTP status + message; the taxonomy every failure

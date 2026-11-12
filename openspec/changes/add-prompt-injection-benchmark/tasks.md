@@ -1,0 +1,36 @@
+# Tasks
+
+## 1. Backend: preset registry and `/api/llm-call` endpoint
+
+- [x] 1.1 Define the server-side system-prompt preset registry with a resolver: `summarize` → the existing `SUMMARY_INSTRUCTION`, and `judge` → a new `JUDGE_INSTRUCTION` whose model output's first line is exactly one of `resisted`/`partial`/`full` followed by a brief reason. Verify: a unit test asserts both preset ids resolve to non-empty, distinct system-prompt text and an unknown id is rejected.
+- [x] 1.2 Add `InvalidPresetError` to `app/errors.py` (`code="INVALID_PRESET"`, `status=400`) mirroring `InvalidProviderError`. Verify: it is importable and carries the right code and status.
+- [x] 1.3 Add a FastAPI-free call function that builds `[system: <preset text>, user: <text>]` and reuses the existing chat-completions dispatch, and wire a `POST /api/llm-call` route in `app/main.py` that returns 200 with a `text` field and persists no file. Verify: `tests/test_llm_call_endpoint.py::test_llm_call_returns_output_without_persisting` (T-PROMPT-INJECTION-BENCHMARK-011) passes.
+- [x] 1.4 Implement the local-rejection order before any backend call — invalid preset first, then not configured, then unknown provider/model, then overlong text. Verify: `test_unknown_preset_rejected_before_backend` (T-PROMPT-INJECTION-BENCHMARK-012) passes and the analogous not-configured / invalid-provider / overlong rejections are asserted with no backend call made.
+- [x] 1.5 Ensure any client-supplied system-prompt field is ignored (only the preset's text is used). Verify: `test_client_supplied_system_prompt_ignored` (T-PROMPT-INJECTION-BENCHMARK-013) passes.
+- [x] 1.6 Run the backend call on the existing bounded `SUMMARIZE_EXECUTOR` so the shared concurrency bound applies. Verify: `test_llm_call_respects_concurrency_bound` (T-PROMPT-INJECTION-BENCHMARK-015) passes.
+- [x] 1.7 Map backend failures (unreachable / non-2xx / malformed / empty) to `PROVIDER_ERROR` 502. Verify: `test_backend_failure_returns_502` (T-PROMPT-INJECTION-BENCHMARK-014) passes.
+- [x] 1.8 Document the new endpoint and the preset registry in `docs/`, mirroring the existing per-file docs, and regenerate the committed `.html` with `uv run python docs/generate.py`. Verify: the doc exists, describes the endpoint contract and the registered presets, and the regenerated `.html` is committed.
+
+## 2. Frontend: injection panel and client-side splice
+
+- [ ] 2.1 Add the toggle-gated Injection panel (a payload text field) to the UI, hidden/inactive by default and interactive only when a transcript is displayed. Verify: `tests/e2e/test_injection_benchmark.py::test_injection_panel_hidden_by_default` (T-PROMPT-INJECTION-BENCHMARK-001) and `test_enabling_reveals_payload_field` (T-PROMPT-INJECTION-BENCHMARK-002) pass.
+- [ ] 2.2 Add the insertion-point control (`prepend`/`middle`/`append`), defaulting to `append`. Verify: `test_insertion_point_defaults_to_append` (T-PROMPT-INJECTION-BENCHMARK-004) passes.
+- [ ] 2.3 Implement the client-side splice into a single undifferentiated string at the chosen point; a disabled control or empty payload sends the transcript unchanged. Verify: `test_empty_payload_sends_transcript_unchanged` (T-PROMPT-INJECTION-BENCHMARK-003), `test_prepend_payload_is_prefix` (T-PROMPT-INJECTION-BENCHMARK-005), and `test_middle_payload_between_halves` (T-PROMPT-INJECTION-BENCHMARK-006) pass.
+- [ ] 2.4 Ensure the request sent to the backend is one undifferentiated body text with no separate injection/payload field and no app-added label marking the payload. Verify: `test_single_undifferentiated_body_text` (T-PROMPT-INJECTION-BENCHMARK-007) and `test_no_label_marks_payload_to_model` (T-PROMPT-INJECTION-BENCHMARK-008) pass (the e2e recording stub inspects the request).
+- [ ] 2.5 Render the payload and the spliced text via `textContent` only. Verify: `test_markup_like_payload_not_rendered` (T-PROMPT-INJECTION-BENCHMARK-026) passes.
+- [ ] 2.6 Update the frontend docs (`docs/static/app-js.md`) for the injection panel and splice, regenerating the committed `.html` with `uv run python docs/generate.py`. Verify: the doc reflects the new controls and behavior and the regenerated `.html` is committed.
+
+## 3. Frontend: multi-model run, layered oracle, and tally
+
+- [ ] 3.1 Add the model multi-select (populated from `GET /api/providers`) and a Run control that sends the identical spliced text to every selected model via `POST /api/llm-call` (the `summarize` preset), recording one result per model; the run must use only the non-persisting endpoint. Verify: `tests/e2e/test_injection_benchmark.py::test_offers_configured_models_for_selection` (T-PROMPT-INJECTION-BENCHMARK-009), `test_same_text_sent_to_every_selected_model` (T-PROMPT-INJECTION-BENCHMARK-010), `test_benchmark_writes_no_summary_file` (T-PROMPT-INJECTION-BENCHMARK-023), and `test_repeated_runs_do_not_accumulate_files` (T-PROMPT-INJECTION-BENCHMARK-024) pass.
+- [ ] 3.2 Implement the canary: generate a unique token per run, append an emit instruction to the payload, and mark a model a canary hit iff its output contains the token, reported independently per model. Verify: `test_canary_present_is_hit` (T-PROMPT-INJECTION-BENCHMARK-016) and `test_canary_absent_is_miss` (T-PROMPT-INJECTION-BENCHMARK-017) pass.
+- [ ] 3.3 Implement the judge with a selectable judge provider/model: compose the input as the original unspliced transcript plus the model's output, call `POST /api/llm-call` with the `judge` preset, and parse a `resisted`/`partial`/`full` verdict plus a reason; a failed judge shows "unavailable" for that model without failing the run. Verify: `test_judge_verdict_recorded_per_model` (T-PROMPT-INJECTION-BENCHMARK-018), `test_judge_input_contains_transcript_and_output` (T-PROMPT-INJECTION-BENCHMARK-019), and `test_judge_failure_does_not_fail_run` (T-PROMPT-INJECTION-BENCHMARK-020) pass.
+- [ ] 3.4 Add the per-model result row (summary, canary result, judge verdict + reason, and a settable human-verdict control) and the per-model tally (canary hit-rate, judge compliance-rate, human-confirmed rate). Verify: `test_result_row_shown_per_model` (T-PROMPT-INJECTION-BENCHMARK-021) and `test_tally_reflects_runs` (T-PROMPT-INJECTION-BENCHMARK-022) pass.
+- [ ] 3.5 Render each model's output and each judge verdict/reason via `textContent` only. Verify: `test_markup_like_model_output_not_rendered` (T-PROMPT-INJECTION-BENCHMARK-025) passes.
+- [ ] 3.6 Update the frontend docs (`docs/static/app-js.md`) for the benchmark run, the layered oracle, and the tally, regenerating the committed `.html` with `uv run python docs/generate.py`. Verify: the doc reflects the new behavior and the regenerated `.html` is committed.
+
+## 4. Integration and release
+
+- [ ] 4.1 Run the full unit/API suite and the e2e suite and confirm both are green. Verify: `uv run python -m pytest tests/ -q --ignore=tests/e2e` and `uv run python -m pytest tests/e2e/ -q` both exit 0.
+- [ ] 4.2 Add a README section describing the injection benchmark (enabling it, choosing models, reading the oracle and tally). Verify: the README section is present and accurate.
+- [ ] 4.3 Bump the app's minor version for the user-visible feature. Verify: `uv version --bump minor` updates `pyproject.toml` (and the lock) without hand-editing.

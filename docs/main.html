@@ -47,15 +47,17 @@ that map module results onto JSON responses.</p>
 <li><code>main()</code> — the production entry point (Docker <code>CMD</code>): re-sets up logging,
   installs the exception hook, runs uvicorn with <code>limit_concurrency=100</code>.</li>
 <li>Request models: <code>TranscriptRequest</code> (<code>url</code>), <code>SummarizeRequest</code>
-  (<code>text</code>, <code>name</code>, <code>provider</code>, <code>model</code>).</li>
+  (<code>text</code>, <code>name</code>, <code>provider</code>, <code>model</code>), <code>LlmCallRequest</code> (<code>text</code>,
+  <code>preset</code>, <code>provider</code>, <code>model</code> — deliberately no system-prompt field).</li>
 <li>Constants: <code>MAX_BODY_BYTES</code> (5 MiB, monkeypatchable in tests),
-  <code>SUMMARIZE_MAX_CONCURRENCY</code> / <code>SUMMARIZE_EXECUTOR</code>, <code>LOG_POLL_TIMEOUT</code>,
+  <code>SUMMARIZE_MAX_CONCURRENCY</code> / <code>SUMMARIZE_EXECUTOR</code> (shared by the
+  summarization <em>and</em> benchmark backend calls), <code>LOG_POLL_TIMEOUT</code>,
   <code>_listen_port()</code>.</li>
 <li>Endpoints: <code>POST /api/transcript</code>, <code>GET /api/transcripts</code>,
   <code>GET /api/transcripts/{name}</code>, <code>GET /api/transcripts/{name}/summary</code>,
-  <code>GET /api/providers</code>, <code>POST /api/summarize</code>, <code>GET /api/settings</code>,
-  <code>POST /api/settings</code>, <code>GET /api/logs</code> (SSE), and the static UI mounted
-  at <code>/</code>.</li>
+  <code>GET /api/providers</code>, <code>POST /api/summarize</code>, <code>POST /api/llm-call</code>,
+  <code>GET /api/settings</code>, <code>POST /api/settings</code>, <code>GET /api/logs</code> (SSE), and
+  the static UI mounted at <code>/</code>.</li>
 </ul>
 <h2>Invariants</h2>
 <ul>
@@ -68,10 +70,23 @@ that map module results onto JSON responses.</p>
   413 rejection still produces an <code>http_request</code> log line. The body-size check
   reads only the <code>Content-Length</code> header — it fires before any body is read.</li>
 <li><strong>No blocking I/O on the event loop.</strong> Every filesystem or network call is
-  dispatched with <code>asyncio.to_thread</code>, <em>except</em> the summarization backend
-  call, which runs on the dedicated 2-worker <code>SUMMARIZE_EXECUTOR</code>
-  (<code>loop.run_in_executor</code> with <code>contextvars.copy_context().run</code>) so slow LLM
-  calls never occupy the default executor shared by every other endpoint.</li>
+  dispatched with <code>asyncio.to_thread</code>, <em>except</em> the LLM backend calls
+  (summarization and <code>POST /api/llm-call</code>), which run on the shared
+  dedicated 2-worker <code>SUMMARIZE_EXECUTOR</code> (<code>loop.run_in_executor</code> with
+  <code>contextvars.copy_context().run</code>) so slow LLM calls never occupy the
+  default executor shared by every other endpoint and the benchmark adds
+  no new unbounded-LLM surface — a multi-model sweep is throttled (2 at a
+  time) rather than hammering local backends.</li>
+<li><strong><code>POST /api/llm-call</code> is non-persisting and preset-driven.</strong> The
+  injection benchmark's route: the system prompt comes only from the
+  server-side preset registry (<code>summarize</code> / <code>judge</code>; a client-supplied
+  prompt field is ignored by the request model), the response is
+  <code>{"text": &lt;model output&gt;}</code>, and the route never creates or modifies a
+  file — benchmark runs cannot pollute the transcript directory.
+  Local-rejection order, all backend-free, first failing step wins:
+  invalid preset (<code>400 INVALID_PRESET</code>) → not configured (<code>503
+  NOT_CONFIGURED</code>) → unknown provider/model (<code>400 INVALID_PROVIDER</code>) →
+  overlong text (<code>400 INPUT_TOO_LONG</code>).</li>
 <li><strong>Read endpoints never touch the fetch chain or its semaphore.</strong> Listing,
   reading transcripts/summaries, listing providers, reading/writing the
   settings, and streaming logs are all independent of in-flight fetches.</li>
@@ -96,7 +111,9 @@ to its <code>status</code>/<code>code</code>/<code>message</code> JSON envelope.
 <code>400 INVALID_BODY</code> / <code>500 WRITE_FAILED</code> (<code>POST /api/settings</code>), and
 <code>404 NOT_FOUND</code> (plain HTTP, not taxonomy entries). The settings body is
 validated before any filesystem access: a non-object body or a
-missing/non-boolean <code>autoSummarize</code> is rejected without touching the disk.</p>
+missing/non-boolean <code>autoSummarize</code> is rejected without touching the disk.
+<code>POST /api/llm-call</code> adds <code>400 INVALID_PRESET</code> (unknown preset id,
+checked before any provider read or backend call).</p>
 <h2>Design decisions</h2>
 <p>Resolved from the archived change design docs:</p>
 <ul>
@@ -123,6 +140,11 @@ missing/non-boolean <code>autoSummarize</code> is rejected without touching the 
   thin wrappers over <code>app/settings.py</code> via <code>asyncio.to_thread</code>; the body is
   validated first, a write failure is <code>500 WRITE_FAILED</code>, and neither
   endpoint touches the fetch chain or the single-flight semaphore.</li>
+<li><code>add-prompt-injection-benchmark</code> — <code>POST /api/llm-call</code>: the
+  non-persisting, preset-driven provider call (decisions 2 and 3: one
+  primitive for delivery and judge, server-side preset registry instead of
+  client prompt text), reusing <code>SUMMARIZE_EXECUTOR</code> and the 100k-char cap
+  (decision 4) with the rejection order of decision 6.</li>
 </ul>
 <h2>Cross-links</h2>
 <ul>

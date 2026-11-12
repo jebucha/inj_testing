@@ -15,15 +15,17 @@ that map module results onto JSON responses.
 - `main()` — the production entry point (Docker `CMD`): re-sets up logging,
   installs the exception hook, runs uvicorn with `limit_concurrency=100`.
 - Request models: `TranscriptRequest` (`url`), `SummarizeRequest`
-  (`text`, `name`, `provider`, `model`).
+  (`text`, `name`, `provider`, `model`), `LlmCallRequest` (`text`,
+  `preset`, `provider`, `model` — deliberately no system-prompt field).
 - Constants: `MAX_BODY_BYTES` (5 MiB, monkeypatchable in tests),
-  `SUMMARIZE_MAX_CONCURRENCY` / `SUMMARIZE_EXECUTOR`, `LOG_POLL_TIMEOUT`,
+  `SUMMARIZE_MAX_CONCURRENCY` / `SUMMARIZE_EXECUTOR` (shared by the
+  summarization *and* benchmark backend calls), `LOG_POLL_TIMEOUT`,
   `_listen_port()`.
 - Endpoints: `POST /api/transcript`, `GET /api/transcripts`,
   `GET /api/transcripts/{name}`, `GET /api/transcripts/{name}/summary`,
-  `GET /api/providers`, `POST /api/summarize`, `GET /api/settings`,
-  `POST /api/settings`, `GET /api/logs` (SSE), and the static UI mounted
-  at `/`.
+  `GET /api/providers`, `POST /api/summarize`, `POST /api/llm-call`,
+  `GET /api/settings`, `POST /api/settings`, `GET /api/logs` (SSE), and
+  the static UI mounted at `/`.
 
 ## Invariants
 
@@ -36,10 +38,23 @@ that map module results onto JSON responses.
   413 rejection still produces an `http_request` log line. The body-size check
   reads only the `Content-Length` header — it fires before any body is read.
 - **No blocking I/O on the event loop.** Every filesystem or network call is
-  dispatched with `asyncio.to_thread`, *except* the summarization backend
-  call, which runs on the dedicated 2-worker `SUMMARIZE_EXECUTOR`
-  (`loop.run_in_executor` with `contextvars.copy_context().run`) so slow LLM
-  calls never occupy the default executor shared by every other endpoint.
+  dispatched with `asyncio.to_thread`, *except* the LLM backend calls
+  (summarization and `POST /api/llm-call`), which run on the shared
+  dedicated 2-worker `SUMMARIZE_EXECUTOR` (`loop.run_in_executor` with
+  `contextvars.copy_context().run`) so slow LLM calls never occupy the
+  default executor shared by every other endpoint and the benchmark adds
+  no new unbounded-LLM surface — a multi-model sweep is throttled (2 at a
+  time) rather than hammering local backends.
+- **`POST /api/llm-call` is non-persisting and preset-driven.** The
+  injection benchmark's route: the system prompt comes only from the
+  server-side preset registry (`summarize` / `judge`; a client-supplied
+  prompt field is ignored by the request model), the response is
+  `{"text": <model output>}`, and the route never creates or modifies a
+  file — benchmark runs cannot pollute the transcript directory.
+  Local-rejection order, all backend-free, first failing step wins:
+  invalid preset (`400 INVALID_PRESET`) → not configured (`503
+  NOT_CONFIGURED`) → unknown provider/model (`400 INVALID_PROVIDER`) →
+  overlong text (`400 INPUT_TOO_LONG`).
 - **Read endpoints never touch the fetch chain or its semaphore.** Listing,
   reading transcripts/summaries, listing providers, reading/writing the
   settings, and streaming logs are all independent of in-flight fetches.
@@ -68,6 +83,8 @@ to its `status`/`code`/`message` JSON envelope. Additionally returns
 `404 NOT_FOUND` (plain HTTP, not taxonomy entries). The settings body is
 validated before any filesystem access: a non-object body or a
 missing/non-boolean `autoSummarize` is rejected without touching the disk.
+`POST /api/llm-call` adds `400 INVALID_PRESET` (unknown preset id,
+checked before any provider read or backend call).
 
 ## Design decisions
 
@@ -96,6 +113,11 @@ Resolved from the archived change design docs:
   thin wrappers over `app/settings.py` via `asyncio.to_thread`; the body is
   validated first, a write failure is `500 WRITE_FAILED`, and neither
   endpoint touches the fetch chain or the single-flight semaphore.
+- `add-prompt-injection-benchmark` — `POST /api/llm-call`: the
+  non-persisting, preset-driven provider call (decisions 2 and 3: one
+  primitive for delivery and judge, server-side preset registry instead of
+  client prompt text), reusing `SUMMARIZE_EXECUTOR` and the 100k-char cap
+  (decision 4) with the rejection order of decision 6.
 
 ## Cross-links
 
