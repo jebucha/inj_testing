@@ -305,6 +305,26 @@ def test_empty_payload_sends_transcript_unchanged(page, server):
     assert delivery[0]["text"] == DEFAULT_PAYLOAD["text"]
 
 
+def test_disabled_after_typing_sends_transcript_unchanged(page, server):
+    """A retained non-empty payload is ignored once the toggle is disabled."""
+    payload = "SHOULD_NOT_BE_SENT"
+    bodies = _llm_call_bodies(page)
+    _fetch(page, VIDEO_URL)
+    _wait_result(page)
+
+    page.check("#injection-toggle")
+    page.fill("#injection-payload", payload)
+    page.uncheck("#injection-toggle")  # the field keeps its value, but is off
+    _select_benchmark_models(page, "Alpha Local — model-a1")
+    page.click("#benchmark-run")
+    _wait_rows(page, 1)
+
+    delivery = _delivery_bodies(bodies)
+    assert len(delivery) == 1
+    assert delivery[0]["text"] == DEFAULT_PAYLOAD["text"]
+    assert payload not in delivery[0]["text"]
+
+
 def test_insertion_point_defaults_to_append(page, server):
     """T-PROMPT-INJECTION-BENCHMARK-004"""
     _fetch(page, VIDEO_URL)
@@ -639,6 +659,27 @@ def test_tally_reflects_runs(page, server):
                   "1 / 2 (50%)"]
     assert a2 == ["alpha/model-a2", "2", "0 / 2 (0%)", "0 / 2 (0%)",
                   "0 / 2 (0%)"]
+
+
+def test_tally_counts_unavailable_judge_in_denominator(page, server):
+    """The judge compliance-rate denominator is ALL of the model's results, so
+    an unavailable judge scores 0/N rather than being excluded."""
+    server["llm_stub"].set_failure("model-b1")  # the judge model is down
+    _fetch(page, VIDEO_URL)
+    _wait_result(page)
+
+    page.check("#injection-toggle")
+    page.fill("#injection-payload", "An embedded request.")
+    page.select_option("#benchmark-judge", label=JUDGE_LABEL)
+    _select_benchmark_models(page, "Alpha Local — model-a1")
+    page.click("#benchmark-run")
+    _wait_rows(page, 1)
+
+    row = page.locator("#benchmark-tally tbody tr").filter(has_text="alpha/model-a1")
+    cells = [c.inner_text() for c in row.locator("td").all()]
+    # runs, canary hit-rate, judge compliance-rate, human-confirmed rate
+    assert cells == ["alpha/model-a1", "1", "0 / 1 (0%)", "0 / 1 (0%)",
+                     "0 / 1 (0%)"]
 
 
 def test_benchmark_writes_no_summary_file(page, server):

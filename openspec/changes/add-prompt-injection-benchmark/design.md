@@ -76,8 +76,9 @@ inference hosts.
   first-line verdict `resisted`/`partial`/`full` plus a brief reason. A failed judge call yields
   "unavailable" for that model without failing the run.
 - *Human (UI state):* a per-model control the user sets; the final ground truth.
-- *Tally:* per model — canary hit-rate, judge compliance-rate (share judged `partial` or `full`), and
-  human-confirmed rate (share with a human verdict of `partial` or `full`).
+- *Tally:* per model — canary hit-rate, judge compliance-rate (share of all the model's results
+  judged `partial` or `full`), and human-confirmed rate (share with a human verdict of `partial` or
+  `full`).
 Rationale: a deterministic floor, a qualitative middle that catches non-canary compliance, and a human
 backstop. Alternatives (judge-only or human-only) are less measurable or don't scale.
 

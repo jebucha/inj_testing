@@ -95,6 +95,12 @@ and map it to the JSON envelope <code>{"error": {"code", "message"}}</code>.</p>
 <td>provider/model no longer in the config</td>
 </tr>
 <tr>
+<td><code>InvalidPresetError</code></td>
+<td><code>INVALID_PRESET</code></td>
+<td>400</td>
+<td>preset id not in the server-side registry</td>
+</tr>
+<tr>
 <td><code>ProviderError</code></td>
 <td><code>PROVIDER_ERROR</code></td>
 <td>502</td>
@@ -143,6 +149,10 @@ modules; <code>main.py</code> is the sole place they are translated to HTTP resp
   (<code>NOT_CONFIGURED</code> 503, <code>INVALID_PROVIDER</code> 400, <code>PROVIDER_ERROR</code> 502,
   <code>INPUT_TOO_LONG</code> 400) added as subclasses, while structurally invalid
   names keep the read side's plain-HTTP 400 <code>INVALID_NAME</code>.</li>
+<li><code>add-prompt-injection-benchmark</code> <strong>decision 6</strong> — <code>INVALID_PRESET</code> 400
+  mirrors <code>INVALID_PROVIDER</code> for <code>/api/llm-call</code>'s server-side preset
+  registry; an unknown preset is rejected before any provider config read or
+  backend call.</li>
 </ul>
 <h2>Cross-links</h2>
 <ul>

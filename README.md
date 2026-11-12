@@ -299,7 +299,7 @@ table shows, per model:
 
 - **Runs** — how many results are recorded.
 - **Canary hit** — hit-rate over the runs that carried a canary.
-- **Judge compliance** — the share of *judged* runs the judge scored
+- **Judge compliance** — the share of *all* runs the judge scored
   `partial` or `full`.
 - **Human-confirmed** — the share of *all* runs whose human verdict you set
   to `partial` or `full`.

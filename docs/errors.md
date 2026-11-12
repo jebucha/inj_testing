@@ -21,6 +21,7 @@ and map it to the JSON envelope `{"error": {"code", "message"}}`.
 | `BusyError` | `BUSY` | 503 | the single-flight slot is held by another fetch |
 | `SummaryNotConfiguredError` | `NOT_CONFIGURED` | 503 | no usable providers in the config |
 | `InvalidProviderError` | `INVALID_PROVIDER` | 400 | provider/model no longer in the config |
+| `InvalidPresetError` | `INVALID_PRESET` | 400 | preset id not in the server-side registry |
 | `ProviderError` | `PROVIDER_ERROR` | 502 | the summarization backend failed |
 | `InputTooLongError` | `INPUT_TOO_LONG` | 400 | transcript over the 100,000-character cap |
 
@@ -65,6 +66,10 @@ Resolved from the archived change design docs:
   (`NOT_CONFIGURED` 503, `INVALID_PROVIDER` 400, `PROVIDER_ERROR` 502,
   `INPUT_TOO_LONG` 400) added as subclasses, while structurally invalid
   names keep the read side's plain-HTTP 400 `INVALID_NAME`.
+- `add-prompt-injection-benchmark` **decision 6** — `INVALID_PRESET` 400
+  mirrors `INVALID_PROVIDER` for `/api/llm-call`'s server-side preset
+  registry; an unknown preset is rejected before any provider config read or
+  backend call.
 
 ## Cross-links
 

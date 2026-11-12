@@ -156,9 +156,9 @@ ids it requires from <code>index.html</code>: <code>url-input</code>, <code>fetc
   insertion-point settings, since the same payload can target a new carrier.</li>
 <li><strong>Tally semantics</strong> (per model, across its recorded results): canary
   hit-rate over the results that <em>carried a canary</em>; judge compliance-rate
-  (share judged <code>partial</code> or <code>full</code>) over the results that were <em>judged</em>;
-  human-confirmed rate (share with a human verdict of <code>partial</code> or <code>full</code>) over
-  <em>all</em> results. Rendered <code>"N / M (P%)"</code>, or <code>"—"</code> when the denominator is 0.
+  (share of <em>all</em> results judged <code>partial</code> or <code>full</code>); human-confirmed rate
+  (share with a human verdict of <code>partial</code> or <code>full</code>) over <em>all</em> results.
+  Rendered <code>"N / M (P%)"</code>, or <code>"—"</code> when the denominator is 0.
   Rows and tally rows appear in completion order, so tests filter by the
   <code>provider/model</code> key, never by position.</li>
 <li><strong>Everything renders as plain text.</strong> The payload, the spliced preview, each

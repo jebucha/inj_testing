@@ -752,6 +752,7 @@
     benchmarkRunBtn.disabled =
       !(hasTranscript && modelsReady && !benchRunning &&
         selectedBenchmarkModels().length > 0);
+    benchmarkSpinner.hidden = !benchRunning;
     updateInjectionPreview();
   }
 
@@ -964,9 +965,10 @@
   }
 
   // Per-model aggregate tally across runs: canary hit-rate (of the model's
-  // results that carried a canary), judge compliance-rate (share of judged
-  // results in {partial, full}), human-confirmed rate (share of all of the
-  // model's results whose human verdict is set to partial or full).
+  // results that carried a canary), judge compliance-rate (share of all of
+  // the model's results judged in {partial, full}), human-confirmed rate
+  // (share of all of the model's results whose human verdict is set to
+  // partial or full).
   function renderTally() {
     benchmarkTallyBody.textContent = "";
     for (var key in benchRuns) {
@@ -986,7 +988,7 @@
       var row = document.createElement("tr");
       var cells = [key, String(results.length),
                    pct(hits.length, canaried.length),
-                   pct(compliant.length, judged.length),
+                   pct(compliant.length, results.length),
                    pct(confirmed.length, results.length)];
       for (var i = 0; i < cells.length; i++) {
         var cell = document.createElement("td");
