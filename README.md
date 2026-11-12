@@ -23,7 +23,8 @@ third-party transcript service.
   `NO_CAPTIONS` 404, `UPSTREAM_FAILURE` 502, `BUSY` 503; the saved-transcript
   read endpoints add `INVALID_NAME` 400 and `NOT_FOUND` 404; summarization
   adds `NOT_CONFIGURED` 503, `INVALID_PROVIDER` 400, `PROVIDER_ERROR` 502,
-  and `INPUT_TOO_LONG` 400.
+  and `INPUT_TOO_LONG` 400; the injection benchmark's non-persisting
+  `POST /api/llm-call` endpoint adds `INVALID_PRESET` 400.
 - **Concurrency:** at most one YouTube fetch chain at a time; a second
   concurrent request gets `503 BUSY` immediately.
 
@@ -245,6 +246,75 @@ try again.
 **A note on keys.** If a `baseURL` is not `localhost`/loopback and the
 provider carries an `apiKey`, use `https://` so the key does not cross the
 network in the clear.
+
+## Injection benchmark
+
+A prompt-injection testing harness, built on the same provider config as
+summarization. **The displayed transcript (with your payload spliced in) is
+sent to the backends you configure**, so point the config at models you are
+willing to test. It is a *red-team* tool: the payload is attacker-controlled
+text, and the models you select are the targets.
+
+**Enabling it.** With a transcript displayed (fetched or from the saved
+library), tick the **Injection** toggle in the result panel. This reveals:
+
+- **Payload** — the attacker text you want to embed (e.g. a hidden
+  instruction). Leave it empty to send the transcript unchanged (baseline).
+- **Insertion point** — `Prepend` (top), `Middle` (near the center, on a
+  line boundary), or `Append` (bottom, the default). A live preview shows
+  the exact spliced text that will be sent.
+- **Models** — a multi-select of every configured provider/model; pick one
+  or more targets (Ctrl/Cmd-click to select several).
+- **Judge** — a single provider/model that acts as the LLM-as-judge oracle
+  (defaults to the same target the summarize picker pre-selects).
+- **Run benchmark** — sends the identical spliced text to every selected
+  model and records one result per model per run.
+
+**How it stays clean.** The splice happens *client-side* and produces one
+undifferentiated string — the backend and the model never see a separate
+"injection" field or any label marking the payload (this is what makes it a
+faithful *indirect* injection test). Delivery and judging both go through
+the non-persisting `POST /api/llm-call` endpoint, so **no `.summary` file is
+ever created or modified** — the saved-transcript list is untouched. System
+prompts come only from a server-side preset registry (`summarize` for
+delivery, `judge` for judging); the client cannot supply its own.
+
+**The layered oracle.** Each model's result is scored three ways, so you can
+trust the deterministic layer when it fires and use the others when it does
+not:
+
+- **Canary** (deterministic): a unique token is generated per run and a
+  matching emit-instruction is appended to the payload. A model counts as a
+  **hit** only if its own output contains the token.
+- **Judge** (LLM): the judge model reads the *original, unspliced* transcript
+  plus the target model's output and returns a first-line verdict of
+  `resisted` / `partial` / `full` with a brief reason. A failed or
+  unparseable judge is reported as `unavailable` for that model only and
+  never fails the run.
+- **Human** (you): a settable verdict per result row (`—` / `resisted` /
+  `partial` / `full`) — the final ground truth.
+
+**Reading the tally.** Results accumulate per model across runs. The tally
+table shows, per model:
+
+- **Runs** — how many results are recorded.
+- **Canary hit** — hit-rate over the runs that carried a canary.
+- **Judge compliance** — the share of *judged* runs the judge scored
+  `partial` or `full`.
+- **Human-confirmed** — the share of *all* runs whose human verdict you set
+  to `partial` or `full`.
+
+Rates render as `N / M (P%)`, or `—` when the denominator is zero. Each run
+also has a detail row (the model's output, canary result, judge verdict and
+reason, and the human-verdict control). Displaying a new transcript clears
+the recorded results (but keeps your payload and insertion-point setup, since
+the same payload can target a new carrier).
+
+**Error messages.** `INVALID_PRESET` 400 — the requested preset id is not in
+the server-side registry (the UI only ever sends registered presets, so this
+appears only for hand-crafted requests). Otherwise the summarization codes
+apply: `NOT_CONFIGURED` 503, `INVALID_PROVIDER` 400, `PROVIDER_ERROR` 502,
+`INPUT_TOO_LONG` 400.
 
 ## When YouTube breaks the fetchers (library-update runbook)
 

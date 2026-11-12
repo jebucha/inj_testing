@@ -18,7 +18,15 @@ Design tokens: `--bg`, `--panel`, `--text`, `--muted`, `--accent`,
 `.auto-summarize-label` (the checkbox label; dims with the input's
 `:disabled` via `:has()`), `.auto-note` (the muted auto-summarize failure
 note), `.summary-*`, `.saved-*` (`.saved-row` is the button-styled list
-item), `.log-panel`.
+item), `.injection-panel` / `.injection-controls` (the benchmark panel and its
+flex control row), `.injection-toggle-label` (dims with the toggle's
+`:disabled` via `:has()`), `.injection-point` / `.benchmark-judge` (the
+single-select controls), `.benchmark-label`, `.benchmark-models` (the
+multi-select), `.injection-payload`, `.injection-preview` (the dashed
+spliced-text preview), `.benchmark-tally` (the per-model results table),
+`.benchmark-rows` / `.bench-row` / `.bench-row-title` / `.bench-output` /
+`.bench-meta` / `.bench-human-label` / `.bench-human` (the per-model result
+rows), `.log-panel`.
 
 ## Invariants
 
@@ -37,8 +45,8 @@ item), `.log-panel`.
   when hidden.
 - **Every long region scrolls internally with a bounded height:** the
   transcript panel `max-height: 60vh`, the summary text and saved list
-  `40vh`, the log panel `40vh` — opening any of them never grows the page
-  without bound.
+  `40vh`, the log panel `40vh`, the injection spliced-text preview `30vh` —
+  opening any of them never grows the page without bound.
 - **Buttons are keyboard- and state-honest:** `.btn:disabled` dims and
   forbids; `.saved-row` keeps `:focus-visible` outlines; hover states apply
   only to `:not(:disabled)`.
@@ -68,6 +76,11 @@ Resolved from the archived change design docs:
 - `2026-11-06-move-log-panel-into-header` **D2/D3** — the column-of-rows
   header (`align-items: stretch` so rows span the full width) and the
   row-gap spacing that replaced the old `.log-panel { margin: 32px 0 0; }`.
+- `add-prompt-injection-benchmark` **decision 1** and **decision 5** — the
+  injection-benchmark panel's treatment: the flex control row, the bounded
+  spliced-text preview, and the per-model tally table + result rows that the
+  layered oracle (canary/judge/human) populates, all following the existing
+  region conventions (bounded scroll, keyboard/state-honest controls).
 
 ## Cross-links
 

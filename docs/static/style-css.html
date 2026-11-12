@@ -49,7 +49,15 @@ of any kind — the app's no-CDN constraint applies to CSS as firmly as to JS.</
 <code>.auto-summarize-label</code> (the checkbox label; dims with the input's
 <code>:disabled</code> via <code>:has()</code>), <code>.auto-note</code> (the muted auto-summarize failure
 note), <code>.summary-*</code>, <code>.saved-*</code> (<code>.saved-row</code> is the button-styled list
-item), <code>.log-panel</code>.</p>
+item), <code>.injection-panel</code> / <code>.injection-controls</code> (the benchmark panel and its
+flex control row), <code>.injection-toggle-label</code> (dims with the toggle's
+<code>:disabled</code> via <code>:has()</code>), <code>.injection-point</code> / <code>.benchmark-judge</code> (the
+single-select controls), <code>.benchmark-label</code>, <code>.benchmark-models</code> (the
+multi-select), <code>.injection-payload</code>, <code>.injection-preview</code> (the dashed
+spliced-text preview), <code>.benchmark-tally</code> (the per-model results table),
+<code>.benchmark-rows</code> / <code>.bench-row</code> / <code>.bench-row-title</code> / <code>.bench-output</code> /
+<code>.bench-meta</code> / <code>.bench-human-label</code> / <code>.bench-human</code> (the per-model result
+rows), <code>.log-panel</code>.</p>
 <h2>Invariants</h2>
 <ul>
 <li><strong>Self-contained.</strong> No <code>@import</code>, no web fonts, no external URLs; the
@@ -67,8 +75,8 @@ item), <code>.log-panel</code>.</p>
   when hidden.</li>
 <li><strong>Every long region scrolls internally with a bounded height:</strong> the
   transcript panel <code>max-height: 60vh</code>, the summary text and saved list
-  <code>40vh</code>, the log panel <code>40vh</code> — opening any of them never grows the page
-  without bound.</li>
+  <code>40vh</code>, the log panel <code>40vh</code>, the injection spliced-text preview <code>30vh</code> —
+  opening any of them never grows the page without bound.</li>
 <li><strong>Buttons are keyboard- and state-honest:</strong> <code>.btn:disabled</code> dims and
   forbids; <code>.saved-row</code> keeps <code>:focus-visible</code> outlines; hover states apply
   only to <code>:not(:disabled)</code>.</li>
@@ -93,6 +101,11 @@ item), <code>.log-panel</code>.</p>
 <li><code>2026-11-06-move-log-panel-into-header</code> <strong>D2/D3</strong> — the column-of-rows
   header (<code>align-items: stretch</code> so rows span the full width) and the
   row-gap spacing that replaced the old <code>.log-panel { margin: 32px 0 0; }</code>.</li>
+<li><code>add-prompt-injection-benchmark</code> <strong>decision 1</strong> and <strong>decision 5</strong> — the
+  injection-benchmark panel's treatment: the flex control row, the bounded
+  spliced-text preview, and the per-model tally table + result rows that the
+  layered oracle (canary/judge/human) populates, all following the existing
+  region conventions (bounded scroll, keyboard/state-honest controls).</li>
 </ul>
 <h2>Cross-links</h2>
 <ul>

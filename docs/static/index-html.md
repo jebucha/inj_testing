@@ -5,8 +5,8 @@
 The entire web UI's markup: one page, no framework, no build step, no CDN.
 It defines the DOM contract that `app.js` consumes — every id the script
 reaches for — and the visible structure: header (with the log viewer), the
-fetch form, the error banner, the result section (transcript panel +
-summary panel), and the saved-transcripts section.
+fetch form, the error banner, the result section (transcript panel, summary
+panel, and the injection-benchmark panel), and the saved-transcripts section.
 
 ## Public surface
 
@@ -25,6 +25,16 @@ The effective API is the id/class contract with `app.js`:
   automatic summarization fails).
 - Saved list: `saved-list`, `saved-empty`, `saved-count`,
   `saved-refresh-btn`.
+- Injection benchmark (a `section` inside the result section, below the
+  summary panel): `injection-toggle` (the enable checkbox, inside
+  `injection-toggle-label`), `injection-point` (the `prepend`/`middle`/
+  `append` select, defaulting to `append`), `injection-payload` (the payload
+  `<textarea>`, hidden until the toggle is on), `injection-preview` (the
+  spliced-text preview `<pre>`), `benchmark-models` (the multi-select),
+  `benchmark-judge` (the judge provider/model select), `benchmark-run`
+  (+ `benchmark-spinner` and its `benchmark-label`), `benchmark-results`,
+  `benchmark-tally` (the per-model table), and `benchmark-rows` (the
+  per-model result rows).
 - Log viewer: `logs-toggle`, `log-panel`.
 
 ## Invariants
@@ -44,10 +54,14 @@ The effective API is the id/class contract with `app.js`:
   `tabindex="0"` on the scrollable `<pre>` panels, `type="button"` on
   non-submit buttons, `aria-hidden` on the spinners.
 - **Buttons start disabled where `app.js` requires it** (copy, download,
-  summarize, the provider picker, and the auto-summarize checkbox); the
-  script enables them as state allows.
+  summarize, the provider picker, the auto-summarize checkbox, and the whole
+  injection-benchmark control set — the injection toggle, insertion point,
+  model/judge pickers, and Run); the script enables them as state allows.
 - **The result section is hidden until the first transcript** — fresh fetch
-  and saved-row display both render into this same single panel.
+  and saved-row display both render into this same single panel. The
+  injection panel is a child of it, so it is hidden until a transcript is
+  displayed too; the payload field and preview additionally start `hidden`
+  and are revealed only while the toggle is on.
 
 ## Log events emitted
 
@@ -76,6 +90,12 @@ Resolved from the archived change design docs:
 - `add-auto-summarize` **D6** — the `auto-summarize` checkbox next to the
   provider picker and the hidden `auto-summarize-note` `<p>` beneath the
   summarize actions (a muted inline note, not the error banner).
+- `add-prompt-injection-benchmark` **decision 1** (the injection panel and
+  splice live in the UI, so the panel sits inside the result section and is
+  only reachable once a transcript is displayed) and **decision 5** (the
+  layered oracle: the models multi-select, the judge select, and the
+  per-model tally table + result rows that the canary/judge/human verdicts
+  populate).
 
 ## Cross-links
 

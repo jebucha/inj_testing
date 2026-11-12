@@ -51,6 +51,8 @@ SUMMARY_INSTRUCTION = (
     "and do not invent content that is not in the transcript."
 )
 
+SUMMARY_EXTENSION = ".summary"
+
 # Fixed, server-side judge instruction for the injection benchmark's
 # LLM-as-judge oracle (prompt-injection-benchmark design decision 5): the
 # model output's first line must be exactly one of `resisted` / `partial` /
@@ -88,7 +90,6 @@ def resolve_preset(preset_id: str) -> str:
         return PRESETS[preset_id]
     except KeyError:
         raise InvalidPresetError() from None
-
 
 
 class ProviderCallError(Exception):

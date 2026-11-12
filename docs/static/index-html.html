@@ -38,8 +38,8 @@
 <p>The entire web UI's markup: one page, no framework, no build step, no CDN.
 It defines the DOM contract that <code>app.js</code> consumes — every id the script
 reaches for — and the visible structure: header (with the log viewer), the
-fetch form, the error banner, the result section (transcript panel +
-summary panel), and the saved-transcripts section.</p>
+fetch form, the error banner, the result section (transcript panel, summary
+panel, and the injection-benchmark panel), and the saved-transcripts section.</p>
 <h2>Public surface</h2>
 <p>The asset set is exactly three files referenced with absolute paths:
 <code>/style.css</code>, <code>/app.js</code>, and this page (served by the static mount at <code>/</code>).
@@ -56,6 +56,16 @@ The effective API is the id/class contract with <code>app.js</code>:</p>
   automatic summarization fails).</li>
 <li>Saved list: <code>saved-list</code>, <code>saved-empty</code>, <code>saved-count</code>,
   <code>saved-refresh-btn</code>.</li>
+<li>Injection benchmark (a <code>section</code> inside the result section, below the
+  summary panel): <code>injection-toggle</code> (the enable checkbox, inside
+  <code>injection-toggle-label</code>), <code>injection-point</code> (the <code>prepend</code>/<code>middle</code>/
+  <code>append</code> select, defaulting to <code>append</code>), <code>injection-payload</code> (the payload
+  <code>&lt;textarea&gt;</code>, hidden until the toggle is on), <code>injection-preview</code> (the
+  spliced-text preview <code>&lt;pre&gt;</code>), <code>benchmark-models</code> (the multi-select),
+  <code>benchmark-judge</code> (the judge provider/model select), <code>benchmark-run</code>
+  (+ <code>benchmark-spinner</code> and its <code>benchmark-label</code>), <code>benchmark-results</code>,
+  <code>benchmark-tally</code> (the per-model table), and <code>benchmark-rows</code> (the
+  per-model result rows).</li>
 <li>Log viewer: <code>logs-toggle</code>, <code>log-panel</code>.</li>
 </ul>
 <h2>Invariants</h2>
@@ -75,10 +85,14 @@ The effective API is the id/class contract with <code>app.js</code>:</p>
   <code>tabindex="0"</code> on the scrollable <code>&lt;pre&gt;</code> panels, <code>type="button"</code> on
   non-submit buttons, <code>aria-hidden</code> on the spinners.</li>
 <li><strong>Buttons start disabled where <code>app.js</code> requires it</strong> (copy, download,
-  summarize, the provider picker, and the auto-summarize checkbox); the
-  script enables them as state allows.</li>
+  summarize, the provider picker, the auto-summarize checkbox, and the whole
+  injection-benchmark control set — the injection toggle, insertion point,
+  model/judge pickers, and Run); the script enables them as state allows.</li>
 <li><strong>The result section is hidden until the first transcript</strong> — fresh fetch
-  and saved-row display both render into this same single panel.</li>
+  and saved-row display both render into this same single panel. The
+  injection panel is a child of it, so it is hidden until a transcript is
+  displayed too; the payload field and preview additionally start <code>hidden</code>
+  and are revealed only while the toggle is on.</li>
 </ul>
 <h2>Log events emitted</h2>
 <p>None (markup). The <code>log-panel</code> <code>&lt;pre&gt;</code> is where <code>app.js</code> appends the
@@ -102,6 +116,12 @@ humanized server log lines.</p>
 <li><code>add-auto-summarize</code> <strong>D6</strong> — the <code>auto-summarize</code> checkbox next to the
   provider picker and the hidden <code>auto-summarize-note</code> <code>&lt;p&gt;</code> beneath the
   summarize actions (a muted inline note, not the error banner).</li>
+<li><code>add-prompt-injection-benchmark</code> <strong>decision 1</strong> (the injection panel and
+  splice live in the UI, so the panel sits inside the result section and is
+  only reachable once a transcript is displayed) and <strong>decision 5</strong> (the
+  layered oracle: the models multi-select, the judge select, and the
+  per-model tally table + result rows that the canary/judge/human verdicts
+  populate).</li>
 </ul>
 <h2>Cross-links</h2>
 <ul>

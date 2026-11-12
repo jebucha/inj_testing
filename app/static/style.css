@@ -241,6 +241,170 @@ h1 {
   line-height: 1.55;
 }
 
+/* --- Injection benchmark panel ---------------------------------------------- */
+
+.injection-panel { margin-top: 16px; }
+
+.injection-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.injection-toggle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 4px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.injection-toggle-label:has(input:disabled) {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.injection-point,
+.benchmark-judge {
+  padding: 9px 10px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.benchmark-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.benchmark-models {
+  min-width: 220px;
+  padding: 6px 8px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.injection-payload {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 10px 12px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  resize: vertical;
+}
+
+.injection-preview {
+  margin: 10px 0 0;
+  padding: 12px 14px;
+  max-height: 30vh;
+  overflow-y: auto;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: inherit;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.benchmark-results { margin-top: 16px; }
+
+.benchmark-tally {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.benchmark-tally th,
+.benchmark-tally td {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  text-align: left;
+  background: var(--panel);
+}
+
+.benchmark-tally th {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.benchmark-rows { margin-top: 12px; }
+
+.bench-row {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.bench-row-title {
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+}
+
+.bench-output {
+  margin: 0 0 8px;
+  padding: 10px 12px;
+  max-height: 30vh;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: inherit;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.bench-meta {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.bench-human-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+}
+
+.bench-human {
+  padding: 2px 4px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
 /* --- Saved transcripts section -------------------------------------------- */
 
 .saved-section { margin-top: 32px; }

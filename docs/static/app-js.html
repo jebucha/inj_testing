@@ -37,9 +37,9 @@
 <h2>Purpose</h2>
 <p>The entire frontend behavior, in one vanilla-JS IIFE with <code>"use strict"</code>:
 fetch flow and result display, copy/download, the saved-transcripts list,
-summarization, and the live log viewer. No framework, no build step, no CDN
-— the file is served as-is at <code>/app.js</code> and references DOM ids defined in
-<code>index.html</code>.</p>
+summarization, the prompt-injection benchmark, and the live log viewer. No
+framework, no build step, no CDN — the file is served as-is at <code>/app.js</code> and
+references DOM ids defined in <code>index.html</code>.</p>
 <h2>Public surface</h2>
 <p>Nothing is exported (module-scoped IIFE). Its effective API is the set of DOM
 ids it requires from <code>index.html</code>: <code>url-input</code>, <code>fetch-form</code>, <code>fetch-btn</code>,
@@ -47,9 +47,13 @@ ids it requires from <code>index.html</code>: <code>url-input</code>, <code>fetc
 <code>transcript-panel</code>, <code>copy-btn</code>, <code>download-btn</code>, <code>saved-list</code>, <code>saved-empty</code>,
 <code>saved-count</code>, <code>saved-refresh-btn</code>, <code>provider-picker</code>, <code>summarize-btn</code>,
 <code>summarize-spinner</code>, <code>summary-panel</code>, <code>summary-text</code>, <code>summary-copy-btn</code>,
-<code>auto-summarize</code>, <code>auto-summarize-note</code>, <code>log-panel</code>, <code>logs-toggle</code>. It
-also defines the <code>ERROR_MESSAGES</code> map (server error code → human message)
-for the nine taxonomy codes.</p>
+<code>auto-summarize</code>, <code>auto-summarize-note</code>, <code>injection-panel</code>,
+<code>injection-toggle</code>, <code>injection-toggle-label</code>, <code>injection-point</code>,
+<code>injection-payload</code>, <code>injection-preview</code>, <code>benchmark-models</code>,
+<code>benchmark-judge</code>, <code>benchmark-run</code>, <code>benchmark-spinner</code>, <code>benchmark-label</code>,
+<code>benchmark-results</code>, <code>benchmark-tally</code>, <code>benchmark-rows</code>, <code>log-panel</code>,
+<code>logs-toggle</code>. It also defines the <code>ERROR_MESSAGES</code> map (server error code
+→ human message) for the nine taxonomy codes.</p>
 <h2>Invariants</h2>
 <ul>
 <li><strong>No-<code>innerHTML</code> rule — absolute.</strong> Every fetched string (transcript,
@@ -112,12 +116,68 @@ for the nine taxonomy codes.</p>
 <li><strong>SSE is fire-and-forget.</strong> <code>EventSource</code> reconnects automatically;
   unparseable payloads are dropped; no error handling is needed.</li>
 </ul>
+<h3>Injection benchmark invariants</h3>
+<ul>
+<li><strong>The splice is client-side and produces one undifferentiated string</strong>
+  (design decision 1). <code>splicePayload</code> concatenates the payload at the chosen
+  point (<code>prepend</code> / <code>middle</code> / <code>append</code>, default <code>append</code>) into a single
+  string; a disabled toggle or an empty payload sends the transcript exactly
+  as displayed. The request body is <code>{text, preset, provider, model}</code> only —
+  no separate injection/payload field, and the app never adds a label marking
+  the payload to the model (indirect-injection fidelity). <code>middle</code> cuts at a
+  line boundary near the center so both halves are non-empty for a multi-line
+  transcript (a single-line transcript falls back to a character split).</li>
+<li><strong>The benchmark never persists.</strong> Delivery and judge both go through the
+  non-persisting <code>POST /api/llm-call</code> (the <code>summarize</code> and <code>judge</code> presets);
+  the persisting <code>POST /api/summarize</code> is never called, so no <code>.summary</code> file
+  is created or modified.</li>
+<li><strong>The system prompt is a server-side preset, not client text</strong> (design
+  decision 3). The client sends only a <code>preset</code> id; there is no client system
+  prompt field.</li>
+<li><strong>Layered oracle per model</strong> (design decision 5):</li>
+<li><em>Canary (deterministic):</em> a unique token (<code>INJ-&lt;16 hex&gt;</code>) is generated per
+    run and an emit instruction is appended to the payload (never labeling it
+    an injection). A model is a <strong>hit</strong> iff its own output contains the token
+    (substring match, checked per model). <code>canary</code> is <code>null</code> for payload-less
+    runs.</li>
+<li><em>Judge (LLM):</em> the input is the <strong>original unspliced</strong> transcript plus
+    <code>\n\n---\n\n</code> plus the model's output, called with the <code>judge</code> preset. The
+    verdict is the first line, exactly <code>resisted</code>/<code>partial</code>/<code>full</code>
+    (case-insensitive); the rest is the reason. A failed or unparseable judge
+    is "unavailable" for that model only — it never fails the run.</li>
+<li><em>Human:</em> a per-model settable verdict (<code>—</code>/<code>resisted</code>/<code>partial</code>/<code>full</code>).</li>
+<li><strong>Runs are parallel per model</strong> against the identical spliced text, guarded
+  by the <code>benchRunning</code> flag and stale-discarded via the <code>displayToken</code>
+  (a run started for a previously displayed transcript is dropped). Results
+  accumulate in <code>benchRuns</code>, keyed <code>provider/model</code>, one entry per run.</li>
+<li><strong>A new transcript clears results, not setup.</strong> <code>clearBenchmark</code> (on a new
+  fetch or saved-transcript display) wipes <code>benchRuns</code> — the previous
+  transcript's results no longer apply — but keeps the payload and
+  insertion-point settings, since the same payload can target a new carrier.</li>
+<li><strong>Tally semantics</strong> (per model, across its recorded results): canary
+  hit-rate over the results that <em>carried a canary</em>; judge compliance-rate
+  (share judged <code>partial</code> or <code>full</code>) over the results that were <em>judged</em>;
+  human-confirmed rate (share with a human verdict of <code>partial</code> or <code>full</code>) over
+  <em>all</em> results. Rendered <code>"N / M (P%)"</code>, or <code>"—"</code> when the denominator is 0.
+  Rows and tally rows appear in completion order, so tests filter by the
+  <code>provider/model</code> key, never by position.</li>
+<li><strong>Everything renders as plain text.</strong> The payload, the spliced preview, each
+  model output, and each judge verdict/reason enter the DOM via <code>textContent</code>
+  only.</li>
+<li><strong>The panel is interactive only in context.</strong> The toggle is enabled only
+  while a transcript is displayed; the payload field and insertion point need
+  the toggle on; the model/judge pickers need a transcript, configured models,
+  and no in-flight run; Run needs at least one selected model. The judge
+  select shares the same option list as the multi-select and defaults to the
+  same target the summarize picker pre-selects.</li>
+</ul>
 <h2>Log events emitted</h2>
 <p>None (browser code). It <em>formats</em> server events for the panel via
 <code>LOG_FORMATTERS</code> — one-line humanized formatters for the known events
 (<code>server_started</code>, <code>server_stopped</code>, <code>http_request</code>, <code>fetch_attempt</code>,
 <code>fetch_rejected</code>, <code>transcript_saved</code>, <code>transcript_save_failed</code>,
 <code>summary_completed</code>, <code>summary_failed</code>, <code>summary_save_failed</code>,
+<code>llm_call_completed</code>, <code>llm_call_failed</code>,
 <code>config_load_failed</code>, <code>unhandled_exception</code>), with a
 <code>time  LEVEL  event  key=value …</code> fallback for unknown ones.</p>
 <h2>Error codes handled</h2>
@@ -147,6 +207,14 @@ message); network failures and unexpected shapes get a generic message.</p>
   saved-summary read), <strong>D6</strong> (subdued note for auto failures, checkbox
   revert on a failed settings write), <strong>D7</strong> (accepted: a second auto-fire
   during an in-flight summarize is dropped).</li>
+<li><code>add-prompt-injection-benchmark</code> <strong>decision 1</strong> (the client-side splice
+  into one undifferentiated string — no server knows the split),
+  <strong>decision 2</strong> (delivery and judge both use the non-persisting
+  <code>POST /api/llm-call</code>, never the persisting <code>/api/summarize</code>),
+  <strong>decision 3</strong> (system prompts only from the server-side preset registry —
+  the client sends a <code>preset</code> id, no system text), <strong>decision 5</strong> (the
+  layered oracle: per-run canary token + judge over the original unspliced
+  transcript + settable human verdict, with the per-model tally semantics).</li>
 </ul>
 <h2>Cross-links</h2>
 <ul>

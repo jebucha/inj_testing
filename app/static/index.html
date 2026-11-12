@@ -71,6 +71,51 @@
         </div>
         <pre id="summary-text" class="summary-text" tabindex="0"></pre>
       </section>
+      <section id="injection-panel" class="injection-panel" aria-label="Injection benchmark">
+        <div class="injection-controls">
+          <label id="injection-toggle-label" class="injection-toggle-label">
+            <input id="injection-toggle" type="checkbox" disabled />
+            <span>Injection</span>
+          </label>
+          <select id="injection-point" class="injection-point" disabled
+                  aria-label="Payload insertion point">
+            <option value="prepend">Prepend</option>
+            <option value="middle">Middle</option>
+            <option value="append" selected>Append</option>
+          </select>
+          <label class="benchmark-label">Models
+            <select id="benchmark-models" class="benchmark-models" multiple size="3"
+                    disabled aria-label="Benchmark models"></select>
+          </label>
+          <label class="benchmark-label">Judge
+            <select id="benchmark-judge" class="benchmark-judge" disabled
+                    aria-label="Judge provider and model"></select>
+          </label>
+          <button id="benchmark-run" class="btn" type="button" disabled>
+            <span id="benchmark-spinner" class="spinner" hidden aria-hidden="true"></span>
+            <span id="benchmark-label">Run benchmark</span>
+          </button>
+        </div>
+        <textarea id="injection-payload" class="injection-payload" rows="3"
+                  placeholder="Attacker payload — spliced into the transcript as plain text"
+                  disabled hidden></textarea>
+        <pre id="injection-preview" class="injection-preview" hidden tabindex="0"></pre>
+        <div id="benchmark-results" class="benchmark-results" hidden>
+          <table id="benchmark-tally" class="benchmark-tally">
+            <thead>
+              <tr>
+                <th>Model</th>
+                <th>Runs</th>
+                <th>Canary hit</th>
+                <th>Judge compliance</th>
+                <th>Human-confirmed</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <div id="benchmark-rows" class="benchmark-rows"></div>
+        </div>
+      </section>
     </section>
 
     <section id="saved" class="saved-section" aria-labelledby="saved-title">
