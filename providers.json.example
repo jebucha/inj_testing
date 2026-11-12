@@ -1,0 +1,16 @@
+{
+    "provider": {
+        "openai-compatible": {
+            "name": "OpenAI Compatible",
+            "options": {
+                "baseURL": "https://api.openai.com/v1",
+                "apiKey": "<your-api-key>"
+            },
+            "models": {
+                "gpt-4o-mini": "GPT-4o Mini (cost-effective)",
+                "gpt-4o": "GPT-4o"
+            }
+        }
+    },
+    "default": "openai-compatible"
+}

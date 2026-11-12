@@ -1,0 +1,17 @@
+# Machine-local config (compose PORT override; see README)
+.env
+
+# Provider config (may carry API keys; see providers.json.example)
+providers.json
+providers.json.bk
+.claude/
+.opencode/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Logs
+*.log
