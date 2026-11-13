@@ -17,6 +17,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from app import benchmark_dataset
 from app import chain as chain_mod
 from app import log as applog
 from app import logbus
@@ -585,6 +586,24 @@ def create_app() -> FastAPI:
                 content={"error": {"code": exc.code, "message": exc.message}},
             )
         return {"text": text}
+
+    @app.get("/api/benchmarks")
+    async def benchmarks_endpoint(difficulty: str | None = None):
+        # Read-only dataset pick (design decision 1): a random entry of the
+        # requested difficulty. Difficulty validation, file reading/parsing,
+        # and selection all run in a worker thread (blocking I/O off the
+        # event loop). The endpoint never touches the fetch chain or the
+        # single-flight semaphore, and never creates or modifies a file.
+        try:
+            entry = await asyncio.to_thread(
+                benchmark_dataset.select_entry, difficulty
+            )
+        except TranscriptError as exc:
+            return JSONResponse(
+                status_code=exc.status,
+                content={"error": {"code": exc.code, "message": exc.message}},
+            )
+        return entry
 
     @app.get("/api/logs")
     async def log_stream_endpoint():

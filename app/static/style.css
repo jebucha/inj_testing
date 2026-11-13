@@ -270,6 +270,7 @@ h1 {
 }
 
 .injection-point,
+.difficulty-picker,
 .benchmark-judge {
   padding: 9px 10px;
   font-size: 0.95rem;
@@ -287,6 +288,12 @@ h1 {
   font-size: 0.9rem;
   color: var(--muted);
   white-space: nowrap;
+}
+
+/* Inline status line for a failed dataset pick (hidden except on failure). */
+.difficulty-error {
+  font-size: 0.9rem;
+  color: var(--error-text);
 }
 
 .benchmark-models {

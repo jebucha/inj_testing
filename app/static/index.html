@@ -92,6 +92,20 @@
             <option value="middle">Middle</option>
             <option value="append" selected>Append</option>
           </select>
+          <label class="benchmark-label">Difficulty
+            <select id="difficulty-picker" class="difficulty-picker" disabled
+                    aria-label="Benchmark dataset difficulty">
+              <option value="manual" selected>Manual payload</option>
+              <option value="easy">Easy</option>
+              <option value="medium">Medium</option>
+              <option value="hard">Hard</option>
+            </select>
+          </label>
+          <button id="benchmark-reroll" class="btn" type="button" disabled
+                  title="Fetch a new random payload for the selected difficulty">
+            Re-roll
+          </button>
+          <span id="difficulty-error" class="difficulty-error" hidden></span>
           <label class="benchmark-label">Models
             <select id="benchmark-models" class="benchmark-models" multiple size="3"
                     disabled aria-label="Benchmark models"></select>

@@ -149,5 +149,26 @@ class ModelNotRemovableError(TranscriptError):
         )
 
 
+class InvalidDifficultyError(TranscriptError):
+    code = "INVALID_DIFFICULTY"
+    status = 400
+
+    @property
+    def default_message(self) -> str:
+        return "Unknown difficulty — it must be one of: easy, medium, hard."
+
+
+class DatasetMissingError(TranscriptError):
+    code = "DATASET_MISSING"
+    status = 404
+
+    @property
+    def default_message(self) -> str:
+        return (
+            "The benchmark dataset is missing or has no entries for that "
+            "difficulty."
+        )
+
+
 # Codes for which a fallback attempt is made (transient upstream problems only).
 FALLBACK_CODES = frozenset({"UPSTREAM_FAILURE"})

@@ -37,6 +37,9 @@
   var benchmarkResults = document.getElementById("benchmark-results");
   var benchmarkTallyBody = document.querySelector("#benchmark-tally tbody");
   var benchmarkRows = document.getElementById("benchmark-rows");
+  var difficultyPicker = document.getElementById("difficulty-picker");
+  var benchmarkRerollBtn = document.getElementById("benchmark-reroll");
+  var difficultyError = document.getElementById("difficulty-error");
   var mmEmpty = document.getElementById("mm-empty");
   var mmProviderList = document.getElementById("mm-provider-list");
 
@@ -112,9 +115,17 @@
   // Result log across runs, keyed "provider/model" -> array of results
   // ({provider, model, output, error, canary: true|false|null,
   // judge: "resisted"|"partial"|"full"|"unavailable", judgeReason,
-  // human: ""|"resisted"|"partial"|"full"}). Cleared with each new
+  // human: ""|"resisted"|"partial"|"full",
+  // datasetId: the id of the dataset entry that seeded the run ("" =
+  // manual payload, rendered as no id)}). Cleared with each new
   // transcript (clearBenchmark), never persisted.
   var benchRuns = {};
+  // The id of the dataset entry most recently fetched into the payload
+  // ("" = manual entry). Captured into each run's results at run time so the
+  // result rows can display it (design decision 3); cleared when the user
+  // deselects to "Manual payload" — manual edits to the payload field do
+  // not clear it (the payload was still seeded by that entry).
+  var benchmarkDatasetId = "";
 
   function setBusy(busy) {
     fetchBtn.disabled = busy;
@@ -1053,6 +1064,13 @@
     var pickersEnabled = hasTranscript && modelsReady && !benchRunning;
     benchmarkModels.disabled = !pickersEnabled;
     benchmarkJudge.disabled = !pickersEnabled;
+    // The difficulty picker joins the same governance as the other controls:
+    // a displayed transcript is required and it is never interactive while a
+    // run is in flight. The re-roll control adds the rule that a dataset
+    // difficulty (not the "Manual payload" placeholder) must be selected.
+    difficultyPicker.disabled = !(hasTranscript && !benchRunning);
+    benchmarkRerollBtn.disabled =
+      !(hasTranscript && !benchRunning && difficultyPicker.value !== "manual");
     benchmarkRunBtn.disabled =
       !(hasTranscript && modelsReady && !benchRunning &&
         selectedBenchmarkModels().length > 0);
@@ -1118,6 +1136,86 @@
   injectionPayload.addEventListener("input", updateInjectionPreview);
   benchmarkModels.addEventListener("change", updateBenchmarkEnabled);
 
+  // --- dataset difficulty picker (design decision 2) -------------------------
+
+  function showDifficultyError(message) {
+    difficultyError.textContent = message;
+    difficultyError.hidden = false;
+  }
+
+  function clearDifficultyError() {
+    difficultyError.textContent = "";
+    difficultyError.hidden = true;
+  }
+
+  // One dataset pick (difficulty selection and re-roll share it): fetch a
+  // random entry for the difficulty, put its prompt in the payload field,
+  // store its id, and check the injection toggle when its existing rules
+  // allow (a transcript is displayed). On a failed fetch the error shows in
+  // the status line and any check THIS fetch made is undone (a pre-existing
+  // check is never touched), so the existing enable logic keeps "Run
+  // benchmark" disabled in the fresh-panel case.
+  async function pickDatasetPayload() {
+    var difficulty = difficultyPicker.value;
+    if (difficulty === "manual") return;
+    var wasChecked = injectionToggle.checked;
+    try {
+      var res = await fetch(
+        "/api/benchmarks?difficulty=" + encodeURIComponent(difficulty)
+      );
+      var data = null;
+      try {
+        data = await res.json();
+      } catch (_) {
+        data = null;
+      }
+      if (!res.ok || !data || typeof data.prompt !== "string" || !data.prompt) {
+        var code = data && data.error ? data.error.code : null;
+        var serverMessage = data && data.error ? data.error.message : null;
+        throw new Error(messageFor(code, serverMessage));
+      }
+      clearDifficultyError();
+      injectionPayload.value = data.prompt;
+      benchmarkDatasetId = data.id;
+      // A programmatic `checked` assignment fires no change event, so the
+      // enable/preview update (which shows the field and refreshes the
+      // preview) is explicit.
+      if (!resultSection.hidden) {
+        injectionToggle.checked = true;
+        updateBenchmarkEnabled();
+      }
+    } catch (err) {
+      showDifficultyError(err.message);
+      if (!wasChecked && injectionToggle.checked) {
+        injectionToggle.checked = false;
+        updateBenchmarkEnabled();
+      }
+    }
+  }
+
+  // Difficulty selection: a dataset difficulty fetches a random prompt;
+  // "Manual payload" is a no-op deselect — it clears only the stored entry
+  // id (so result rows stop showing it) and never touches the payload field.
+  difficultyPicker.addEventListener("change", function () {
+    if (difficultyPicker.value === "manual") {
+      benchmarkDatasetId = "";
+      clearDifficultyError();
+      updateBenchmarkEnabled(); // re-disables the re-roll control
+      return;
+    }
+    pickDatasetPayload();
+  });
+
+  // Re-roll: re-runs the same pick for the currently selected difficulty
+  // (re-selecting the same option fires no change event). The control's own
+  // disable rules (placeholder selected, run in flight, no transcript) are
+  // enforced by updateBenchmarkEnabled; the guard is defense in depth.
+  benchmarkRerollBtn.addEventListener("click", function () {
+    if (difficultyPicker.value !== "manual") {
+      pickDatasetPayload();
+    }
+  });
+
   // The non-persisting preset call. Resolves with the model's text or
   // rejects with an Error carrying the humanized message.
   async function llmCall(provider, model, preset, text) {
@@ -1162,7 +1260,8 @@
     return { verdict: "unavailable", reason: output.trim() };
   }
 
-  async function benchOneModel(selection, bodyText, payload, canary, judge, token) {
+  async function benchOneModel(selection, bodyText, payload, canary, judge, token,
+                               datasetId) {
     var result = {
       provider: selection.provider,
       model: selection.model,
@@ -1171,7 +1270,8 @@
       canary: null, // true/false once a payload ran; null for payload-less runs
       judge: "unavailable",
       judgeReason: "",
-      human: ""
+      human: "",
+      datasetId: datasetId // the dataset entry that seeded the run ("" = none)
     };
     try {
       result.output = await llmCall(selection.provider, selection.model,
@@ -1222,6 +1322,9 @@
     updateBenchmarkEnabled();
     var canary = canaryToken();
     var payload = effectivePayload();
+    // The stored dataset entry id at run time (design decision 3): captured
+    // once for the whole run and recorded on every result of it.
+    var datasetId = benchmarkDatasetId;
     if (payload) {
       payload += "\n" + canaryInstruction(canary);
     }
@@ -1229,7 +1332,8 @@
     var judge = judgeSelection();
     try {
       await Promise.all(selected.map(function (selection) {
-        return benchOneModel(selection, bodyText, payload, canary, judge, token);
+        return benchOneModel(selection, bodyText, payload, canary, judge, token,
+                             datasetId);
       }));
     } catch (_) {
       // benchOneModel never rejects; this guards against a future change.
@@ -1335,6 +1439,14 @@
         canary.textContent =
           "Canary: " + (result.canary === null ? "—" : result.canary ? "hit" : "miss");
         meta.appendChild(canary);
+        // The dataset entry id that seeded the run, next to the canary
+        // result; no id stored (manual payload) renders nothing.
+        if (result.datasetId) {
+          var dataset = document.createElement("span");
+          dataset.className = "bench-dataset";
+          dataset.textContent = "  Dataset: " + result.datasetId;
+          meta.appendChild(dataset);
+        }
         var judge = document.createElement("span");
         judge.className = "bench-judge";
         judge.textContent = "  Judge: " + result.judge +

@@ -17,6 +17,10 @@ RUN uv sync --frozen --no-dev
 # Application code (includes app/static/ for the frontend).
 COPY app ./app
 
+# Benchmark dataset (GET /api/benchmarks' CWD-relative default resolves to
+# /app/data/benchmark.jsonl in the container).
+COPY data ./data
+
 # Run as an unprivileged user.
 RUN useradd --create-home --shell /usr/sbin/nologin appuser \
     && chown -R appuser:appuser /app
