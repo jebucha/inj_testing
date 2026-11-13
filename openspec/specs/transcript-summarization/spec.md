@@ -343,7 +343,7 @@ The interface SHALL load the provider list when the page loads, display a picker
   - **Pass:** exit code 0, no skipped tests
 
 ### Requirement: Summary panel and copy
-On a successful summarization, the interface SHALL display the summary in a dedicated panel with a copy action; the panel SHALL stay hidden until shown, clear when a new transcript is displayed, and load a previously saved summary when the saved transcript has one. When auto-summarize is enabled and a freshly fetched transcript already has a saved summary, the panel SHALL also load and show it. The copy action SHALL copy the full summary with a visible "Copied!" confirmation. Failed summarizations SHALL display a cause-specific error message. Summary text SHALL be inserted as plain text only, never HTML.
+On a successful summarization, the interface SHALL display the summary in a dedicated panel with a copy action; the panel SHALL stay hidden until shown, clear when a new transcript is displayed, and load a previously saved summary when the saved transcript has one. When auto-summarize is enabled and a freshly fetched transcript already has a saved summary, the panel SHALL also load and show it. The copy action SHALL copy the full summary with a visible "Copied!" confirmation. Failed summarizations SHALL display a cause-specific error message. Summary text SHALL be inserted as plain text only, never HTML. The panel SHALL have a fixed default height of `10rem` and SHALL NOT enforce a maximum height; a summary taller than the default height SHALL scroll inside the panel. The panel SHALL expose the browser's native vertical resize control in its bottom-right corner (`resize: vertical`, matching the injection payload textarea), SHALL allow the user to enlarge it without an enforced maximum height and to reduce it no further than a `4rem` minimum height, and a resized height SHALL NOT persist across a page reload.
 
 #### Scenario: Summary shown on success
 - **WHEN** a summarize request succeeds
@@ -406,6 +406,15 @@ On a successful summarization, the interface SHALL display the summary in a dedi
   - **ID:** T-TRANSCRIPT-SUMMARIZATION-036
   - **File:** tests/e2e/test_summarization.py::test_summary_markup_shown_as_text
   - **Command:** python -m pytest tests/e2e/test_summarization.py::test_summary_markup_shown_as_text -q
+  - **Pass:** exit code 0, no skipped tests
+
+#### Scenario: Compact default height with vertical resize control
+- **WHEN** a summary is displayed in the panel
+- **THEN** the summary panel occupies its fixed `10rem` default height, exposes the browser's vertical resize control in its bottom-right corner, cannot be reduced below a `4rem` minimum height, scrolls a summary taller than the default height inside itself instead of stretching, and after a page reload and a fresh summarization is back at the `10rem` default height (a resized height does not persist)
+- **Test Requirement**
+  - **ID:** T-TRANSCRIPT-SUMMARIZATION-061
+  - **File:** tests/e2e/test_summarization.py::test_summary_panel_compact_and_resizable
+  - **Command:** python -m pytest tests/e2e/test_summarization.py::test_summary_panel_compact_and_resizable -q
   - **Pass:** exit code 0, no skipped tests
 
 ### Requirement: Empty summary responses are display failures
@@ -568,4 +577,25 @@ A failed automatic summarization SHALL NOT display the page's error banner: the 
   - **ID:** T-TRANSCRIPT-SUMMARIZATION-054
   - **File:** tests/e2e/test_auto_summarize.py::test_manual_failure_still_uses_banner
   - **Command:** python -m pytest tests/e2e/test_auto_summarize.py::test_manual_failure_still_uses_banner -q
+  - **Pass:** exit code 0, no skipped tests
+
+### Requirement: Backend call timeout default
+Every LLM backend call — the summarize call from `POST /api/summarize` and the preset call from `POST /api/llm-call` — SHALL be bounded by a call timeout (connect + read) that defaults to 300 seconds and SHALL be overridable via the `SUMMARY_TIMEOUT` environment variable, read at call time; a non-numeric value SHALL fall back to the default. Timeout failures SHALL surface as a 502 `PROVIDER_ERROR`.
+
+#### Scenario: Default backend call timeout is 300 seconds
+- **WHEN** the app calls the configured backend for `POST /api/summarize` while `SUMMARY_TIMEOUT` is not set
+- **THEN** the backend call is made with a 300 second timeout
+- **Test Requirement**
+  - **ID:** T-TRANSCRIPT-SUMMARIZATION-059
+  - **File:** tests/test_transcript_summarization.py::test_default_summary_timeout_is_300
+  - **Command:** python -m pytest tests/test_transcript_summarization.py::test_default_summary_timeout_is_300 -q
+  - **Pass:** exit code 0, no skipped tests
+
+#### Scenario: Preset provider call uses the same default timeout
+- **WHEN** the app calls the configured backend for `POST /api/llm-call` while `SUMMARY_TIMEOUT` is not set
+- **THEN** the backend call is made with the same 300 second default timeout as summarization
+- **Test Requirement**
+  - **ID:** T-TRANSCRIPT-SUMMARIZATION-060
+  - **File:** tests/test_llm_call_endpoint.py::test_llm_call_uses_default_timeout
+  - **Command:** python -m pytest tests/test_llm_call_endpoint.py::test_llm_call_uses_default_timeout -q
   - **Pass:** exit code 0, no skipped tests

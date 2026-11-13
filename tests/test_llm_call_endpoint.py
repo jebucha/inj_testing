@@ -143,6 +143,18 @@ def test_llm_call_returns_output_without_persisting(api):
         assert list(api["transcript_dir"].iterdir()) == []
 
 
+def test_llm_call_uses_default_timeout(api, monkeypatch):
+    """T-TRANSCRIPT-SUMMARIZATION-060"""
+    monkeypatch.delenv("SUMMARY_TIMEOUT", raising=False)
+
+    response = api["client"].post("/api/llm-call", json=_valid_body())
+
+    assert response.status_code == 200
+    assert len(api["dispatch"].calls) == 1
+    # the same 300 s default as the summarization path
+    assert api["dispatch"].calls[0]["timeout"] == 300.0
+
+
 def test_unknown_preset_rejected_before_backend(api):
     """T-PROMPT-INJECTION-BENCHMARK-012"""
     response = api["client"].post(

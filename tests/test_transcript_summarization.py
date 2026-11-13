@@ -310,6 +310,25 @@ def test_summary_timeout_from_environment(monkeypatch):
     assert calls[0]["timeout"] == summarize_mod.DEFAULT_SUMMARY_TIMEOUT
 
 
+def test_default_summary_timeout_is_300(monkeypatch):
+    """T-TRANSCRIPT-SUMMARIZATION-059"""
+    monkeypatch.delenv("SUMMARY_TIMEOUT", raising=False)
+    calls = _recorded_post(
+        monkeypatch,
+        lambda call: _fake_response(
+            {"choices": [{"message": {"content": "The summary."}}]}
+        ),
+    )
+
+    summary = summarize_mod.summarize_with_provider(
+        _provider(), "model-a", "The transcript text to summarize."
+    )
+
+    assert summary == "The summary."
+    assert len(calls) == 1
+    assert calls[0]["timeout"] == 300.0
+
+
 def test_auth_header_only_when_key_present(monkeypatch):
     """T-TRANSCRIPT-SUMMARIZATION-011"""
     ok = lambda call: _fake_response({"choices": [{"message": {"content": "s"}}]})
@@ -940,7 +959,7 @@ def test_summarize_does_not_starve_other_endpoints(api, monkeypatch):
         elapsed = time.monotonic() - start
         assert listing.status_code == 200
         assert "transcripts" in listing.json()
-        # promptly: well under the summarize timeout (120 s)
+        # promptly: well under the summarize timeout (300 s)
         assert elapsed < 10
     finally:
         for thread in threads:

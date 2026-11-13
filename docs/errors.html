@@ -17,6 +17,7 @@
   <li><a href="fetchers.html">app/fetchers.py</a></li>
   <li><a href="urls.html">app/urls.py</a></li>
   <li><a href="errors.html" aria-current="page">app/errors.py</a></li>
+  <li><a href="benchmark_dataset.html">app/benchmark_dataset.py</a></li>
   <li><a href="persist.html">app/persist.py</a></li>
   <li><a href="library.html">app/library.py</a></li>
   <li><a href="providers.html">app/providers.py</a></li>
@@ -37,11 +38,12 @@
 <main class="content">
 <h1><code>app/errors.py</code> — error taxonomy</h1>
 <h2>Purpose</h2>
-<p>The single error taxonomy for transcript retrieval and summarization. Every
-failure the app can meaningfully report is a <code>TranscriptError</code> subclass
-carrying a machine-readable <code>code</code>, an HTTP <code>status</code>, and a stable
-human-readable <code>message</code> the UI can display. Endpoints catch <code>TranscriptError</code>
-and map it to the JSON envelope <code>{"error": {"code", "message"}}</code>.</p>
+<p>The single error taxonomy for transcript retrieval, summarization, and the
+benchmark dataset endpoint. Every failure the app can meaningfully report is a
+<code>TranscriptError</code> subclass carrying a machine-readable <code>code</code>, an HTTP
+<code>status</code>, and a stable human-readable <code>message</code> the UI can display. Endpoints
+catch <code>TranscriptError</code> and map it to the JSON envelope
+<code>{"error": {"code", "message"}}</code>.</p>
 <h2>Public surface</h2>
 <p><code>TranscriptError</code> (base) and its subclasses:</p>
 <table>
@@ -101,6 +103,18 @@ and map it to the JSON envelope <code>{"error": {"code", "message"}}</code>.</p>
 <td><code>INVALID_PRESET</code></td>
 <td>400</td>
 <td>preset id not in the server-side registry</td>
+</tr>
+<tr>
+<td><code>InvalidDifficultyError</code></td>
+<td><code>INVALID_DIFFICULTY</code></td>
+<td>400</td>
+<td>benchmark dataset difficulty not one of <code>easy</code>/<code>medium</code>/<code>hard</code></td>
+</tr>
+<tr>
+<td><code>DatasetMissingError</code></td>
+<td><code>DATASET_MISSING</code></td>
+<td>404</td>
+<td>the benchmark dataset is absent/unreadable, or has no entries for that difficulty</td>
 </tr>
 <tr>
 <td><code>ProviderError</code></td>
@@ -167,12 +181,18 @@ modules; <code>main.py</code> is the sole place they are translated to HTTP resp
   mirrors <code>INVALID_PROVIDER</code> for <code>/api/llm-call</code>'s server-side preset
   registry; an unknown preset is rejected before any provider config read or
   backend call.</li>
+<li><code>benchmark-difficulty-picker</code> <strong>decision 1</strong> — <code>INVALID_DIFFICULTY</code> 400 and
+  <code>DATASET_MISSING</code> 404 for <code>GET /api/benchmarks</code>: an unknown or missing
+  difficulty is rejected before any filesystem access, and an absent file
+  (or one whose valid lines leave no entry for the difficulty) is a
+  dataset-missing miss rather than a 500.</li>
 </ul>
 <h2>Cross-links</h2>
 <ul>
 <li><a href="chain.html"><code>chain.py</code></a> — where <code>FALLBACK_CODES</code> and <code>BusyError</code> matter</li>
 <li><a href="fetchers.html"><code>fetchers.py</code></a> — the primary mappers of library exceptions</li>
 <li><a href="summarize.html"><code>summarize.py</code></a> — the provider-side failures</li>
+<li><a href="benchmark_dataset.html"><code>benchmark_dataset.py</code></a> — the dataset-pick errors</li>
 <li><a href="main.html"><code>main.py</code></a> — the only place errors become HTTP responses</li>
 </ul>
 </main>

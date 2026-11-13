@@ -35,11 +35,11 @@ MAX_OUTPUT_TOKENS = 16384
 # with INPUT_TOO_LONG rather than risking an opaque provider 400 (design 10).
 MAX_INPUT_CHARS = 100_000
 
-# Backend-call timeout in seconds (connect + read), default sized for local
-# 27B-class models on LAN hardware (design decision 10); overridable via
-# SUMMARY_TIMEOUT, non-numeric values fall back to the default (same style as
-# the PORT handling in app/main.py).
-DEFAULT_SUMMARY_TIMEOUT = 120.0
+# Backend-call timeout in seconds (connect + read); the 300 s default is
+# sized for slower local inference hardware, overridable via SUMMARY_TIMEOUT
+# (non-numeric values fall back to the default; same style as the PORT
+# handling in app/main.py).
+DEFAULT_SUMMARY_TIMEOUT = 300.0
 
 # Fixed, server-side summarization instruction (design decision 1: the prompt
 # is not user-customizable).

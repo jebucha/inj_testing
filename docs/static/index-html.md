@@ -30,11 +30,14 @@ The effective API is the id/class contract with `app.js`:
   `injection-toggle-label`), `injection-point` (the `prepend`/`middle`/
   `append` select, defaulting to `append`), `injection-payload` (the payload
   `<textarea>`, hidden until the toggle is on), `injection-preview` (the
-  spliced-text preview `<pre>`), `benchmark-models` (the multi-select),
-  `benchmark-judge` (the judge provider/model select), `benchmark-run`
-  (+ `benchmark-spinner` and its `benchmark-label`), `benchmark-results`,
-  `benchmark-tally` (the per-model table), and `benchmark-rows` (the
-  per-model result rows).
+  spliced-text preview `<pre>`), `difficulty-picker` (the Difficulty select —
+  a selectable "Manual payload" placeholder plus `easy`/`medium`/`hard`),
+  `benchmark-reroll` (the re-roll button), `difficulty-error` (the hidden
+  inline error status line for a failed dataset pick), `benchmark-models`
+  (the multi-select), `benchmark-judge` (the judge provider/model select),
+  `benchmark-run` (+ `benchmark-spinner` and its `benchmark-label`),
+  `benchmark-results`, `benchmark-tally` (the per-model table), and
+  `benchmark-rows` (the per-model result rows).
 - Log viewer: `logs-toggle`, `log-panel`.
 
 ## Invariants
@@ -56,7 +59,8 @@ The effective API is the id/class contract with `app.js`:
 - **Buttons start disabled where `app.js` requires it** (copy, download,
   summarize, the provider picker, the auto-summarize checkbox, and the whole
   injection-benchmark control set — the injection toggle, insertion point,
-  model/judge pickers, and Run); the script enables them as state allows.
+  difficulty picker, re-roll, model/judge pickers, and Run); the script
+  enables them as state allows.
 - **The result section is hidden until the first transcript** — fresh fetch
   and saved-row display both render into this same single panel. The
   injection panel is a child of it, so it is hidden until a transcript is
@@ -96,6 +100,12 @@ Resolved from the archived change design docs:
   layered oracle: the models multi-select, the judge select, and the
   per-model tally table + result rows that the canary/judge/human verdicts
   populate).
+- `benchmark-difficulty-picker` **decision 2** (the Difficulty select joins
+  the control row after the insertion-point select, with a selectable
+  "Manual payload" placeholder — not `disabled`, so the deselect path is
+  usable) and **decision 4** (the picker and re-roll reuse the existing
+  `benchmark-label`/`btn` classes, and the hidden `difficulty-error` status
+  line sits beside them).
 
 ## Cross-links
 

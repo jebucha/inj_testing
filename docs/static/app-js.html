@@ -17,6 +17,7 @@
   <li><a href="../fetchers.html">app/fetchers.py</a></li>
   <li><a href="../urls.html">app/urls.py</a></li>
   <li><a href="../errors.html">app/errors.py</a></li>
+  <li><a href="../benchmark_dataset.html">app/benchmark_dataset.py</a></li>
   <li><a href="../persist.html">app/persist.py</a></li>
   <li><a href="../library.html">app/library.py</a></li>
   <li><a href="../providers.html">app/providers.py</a></li>
@@ -51,11 +52,15 @@ ids it requires from <code>index.html</code>: <code>url-input</code>, <code>fetc
 <code>summarize-spinner</code>, <code>summary-panel</code>, <code>summary-text</code>, <code>summary-copy-btn</code>,
 <code>auto-summarize</code>, <code>auto-summarize-note</code>, <code>injection-panel</code>,
 <code>injection-toggle</code>, <code>injection-toggle-label</code>, <code>injection-point</code>,
-<code>injection-payload</code>, <code>injection-preview</code>, <code>benchmark-models</code>,
+<code>injection-payload</code>, <code>injection-preview</code>, <code>difficulty-picker</code>,
+<code>benchmark-reroll</code>, <code>difficulty-error</code>, <code>benchmark-models</code>,
 <code>benchmark-judge</code>, <code>benchmark-run</code>, <code>benchmark-spinner</code>, <code>benchmark-label</code>,
 <code>benchmark-results</code>, <code>benchmark-tally</code>, <code>benchmark-rows</code>, <code>log-panel</code>,
 <code>logs-toggle</code>. It also defines the <code>ERROR_MESSAGES</code> map (server error code
-→ human message) for the nine taxonomy codes.</p>
+→ human message) for the eleven taxonomy codes plus <code>NOT_FOUND</code>; the
+dataset-pick errors (<code>INVALID_DIFFICULTY</code>, <code>DATASET_MISSING</code>) surface via
+<code>messageFor</code>'s server-message fallback into the <code>difficulty-error</code> status
+line.</p>
 <h2>Invariants</h2>
 <ul>
 <li><strong>No-<code>innerHTML</code> rule — absolute.</strong> Every fetched string (transcript,
@@ -173,6 +178,32 @@ ids it requires from <code>index.html</code>: <code>url-input</code>, <code>fetc
   select shares the same option list as the multi-select and defaults to the
   same target the summarize picker pre-selects.</li>
 </ul>
+<h3>Dataset difficulty picker invariants</h3>
+<ul>
+<li><strong>The dataset difficulty picker seeds the payload field</strong> (design decision
+  2). Selecting a difficulty fetches a random entry of that difficulty from
+  <code>GET /api/benchmarks</code>, puts its prompt into <code>#injection-payload</code> (a
+  plain-text assignment), stores the entry id, and checks the injection
+  toggle when its existing rules allow (a transcript is displayed) —
+  explicitly calling <code>updateBenchmarkEnabled()</code> afterwards, since a
+  programmatic <code>checked</code> assignment fires no change event. "Manual payload"
+  is a no-op deselect: it clears only the stored entry id and never touches
+  the payload field. The re-roll control re-fetches for the currently
+  selected difficulty (re-selecting the same option fires no change event).
+  The picker and the re-roll join <code>updateBenchmarkEnabled</code>'s governance: the
+  picker needs a displayed transcript and no in-flight run; the re-roll
+  additionally needs a dataset difficulty selected. On a failed fetch the
+  error shows in the <code>#difficulty-error</code> status line and any check <em>this
+  fetch</em> made is undone (a pre-existing check is never touched), so the
+  existing enable logic keeps "Run benchmark" disabled in the fresh-panel
+  case (a transcript displayed, no models selected).</li>
+<li><strong>Each result row shows the dataset entry id that seeded the run</strong>
+  (design decision 3). The stored id is captured at run time into each run's
+  results and rendered as a plain-text meta line next to the canary span;
+  manual edits to the payload field do not clear it (the payload was still
+  seeded by that entry), and runs with no stored id render nothing.
+  Everything renders as plain text, like the rest of the panel.</li>
+</ul>
 <h2>Log events emitted</h2>
 <p>None (browser code). It <em>formats</em> server events for the panel via
 <code>LOG_FORMATTERS</code> — one-line humanized formatters for the known events
@@ -185,8 +216,13 @@ ids it requires from <code>index.html</code>: <code>url-input</code>, <code>fetc
 <h2>Error codes handled</h2>
 <p><code>INVALID_URL</code>, <code>VIDEO_UNAVAILABLE</code>, <code>NO_CAPTIONS</code>, <code>UPSTREAM_FAILURE</code>,
 <code>BUSY</code>, <code>NOT_CONFIGURED</code>, <code>INVALID_PROVIDER</code>, <code>PROVIDER_ERROR</code>,
-<code>INPUT_TOO_LONG</code> — via the <code>ERROR_MESSAGES</code> map (preferred over the server
-message); network failures and unexpected shapes get a generic message.</p>
+<code>INPUT_TOO_LONG</code>, <code>INVALID_MODEL</code>, <code>MODEL_NOT_REMOVABLE</code>, and <code>NOT_FOUND</code> —
+via the <code>ERROR_MESSAGES</code> map (preferred over the server message); network
+failures and unexpected shapes get a generic message. The dataset pick's
+<code>INVALID_DIFFICULTY</code> / <code>DATASET_MISSING</code> surface via <code>messageFor</code>'s
+server-message fallback into the <code>difficulty-error</code> status line (the map
+has no entries for them — the server messages are the stable UI contract
+for these codes).</p>
 <h2>Design decisions</h2>
 <p>Resolved from the archived change design docs:</p>
 <ul>
@@ -217,12 +253,19 @@ message); network failures and unexpected shapes get a generic message.</p>
   the client sends a <code>preset</code> id, no system text), <strong>decision 5</strong> (the
   layered oracle: per-run canary token + judge over the original unspliced
   transcript + settable human verdict, with the per-model tally semantics).</li>
+<li><code>benchmark-difficulty-picker</code> <strong>decision 2</strong> (the picker and re-roll
+  seed the payload field, the selectable "Manual payload" placeholder is a
+  no-op deselect, the explicit <code>updateBenchmarkEnabled()</code> call, and the
+  failed-fetch undo that keeps the fresh-panel run button disabled) and
+  <strong>decision 3</strong> (the stored entry id is captured at run time and rendered
+  on each result row; manual edits do not clear it).</li>
 </ul>
 <h2>Cross-links</h2>
 <ul>
 <li><a href="index-html.html"><code>index.html</code></a> — the DOM it wires up</li>
 <li><a href="style-css.html"><code>style.css</code></a> — the classes it toggles</li>
 <li><a href="../main.html"><code>main.html</code></a> — the endpoints it consumes</li>
+<li><a href="../benchmark_dataset.html"><code>benchmark_dataset.html</code></a> — the dataset pick behind the difficulty picker</li>
 </ul>
 </main>
 </body>

@@ -44,7 +44,7 @@ function with a stub while `list_models` keeps running for real.
   capped at `MAX_DISCOVERED_MODELS` so a hostile or broken backend cannot
   flood the response.
 - **Dedicated bounded executor.** Discovery runs on its own 2-worker pool in
-  `main.py` rather than the summarize pool: a 120 s summarize must not block
+  `main.py` rather than the summarize pool: a 300 s summarize must not block
   a fast /models call, and a hanging discovery must not starve
   summarization.
 - **The file config decides the target.** The endpoint resolves the provider

@@ -160,7 +160,9 @@ h1 {
 .transcript-panel {
   margin: 12px 0 0;
   padding: 14px 16px;
-  max-height: 60vh;
+  height: 14rem;
+  min-height: 4rem;
+  resize: vertical;
   overflow-y: auto;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -229,7 +231,9 @@ h1 {
 .summary-text {
   margin: 10px 0 0;
   padding: 12px 14px;
-  max-height: 40vh;
+  height: 10rem;
+  min-height: 4rem;
+  resize: vertical;
   overflow-y: auto;
   border: 1px solid var(--border);
   border-radius: 8px;

@@ -17,6 +17,7 @@
   <li><a href="../fetchers.html">app/fetchers.py</a></li>
   <li><a href="../urls.html">app/urls.py</a></li>
   <li><a href="../errors.html">app/errors.py</a></li>
+  <li><a href="../benchmark_dataset.html">app/benchmark_dataset.py</a></li>
   <li><a href="../persist.html">app/persist.py</a></li>
   <li><a href="../library.html">app/library.py</a></li>
   <li><a href="../providers.html">app/providers.py</a></li>
@@ -63,11 +64,14 @@ The effective API is the id/class contract with <code>app.js</code>:</p>
   <code>injection-toggle-label</code>), <code>injection-point</code> (the <code>prepend</code>/<code>middle</code>/
   <code>append</code> select, defaulting to <code>append</code>), <code>injection-payload</code> (the payload
   <code>&lt;textarea&gt;</code>, hidden until the toggle is on), <code>injection-preview</code> (the
-  spliced-text preview <code>&lt;pre&gt;</code>), <code>benchmark-models</code> (the multi-select),
-  <code>benchmark-judge</code> (the judge provider/model select), <code>benchmark-run</code>
-  (+ <code>benchmark-spinner</code> and its <code>benchmark-label</code>), <code>benchmark-results</code>,
-  <code>benchmark-tally</code> (the per-model table), and <code>benchmark-rows</code> (the
-  per-model result rows).</li>
+  spliced-text preview <code>&lt;pre&gt;</code>), <code>difficulty-picker</code> (the Difficulty select —
+  a selectable "Manual payload" placeholder plus <code>easy</code>/<code>medium</code>/<code>hard</code>),
+  <code>benchmark-reroll</code> (the re-roll button), <code>difficulty-error</code> (the hidden
+  inline error status line for a failed dataset pick), <code>benchmark-models</code>
+  (the multi-select), <code>benchmark-judge</code> (the judge provider/model select),
+  <code>benchmark-run</code> (+ <code>benchmark-spinner</code> and its <code>benchmark-label</code>),
+  <code>benchmark-results</code>, <code>benchmark-tally</code> (the per-model table), and
+  <code>benchmark-rows</code> (the per-model result rows).</li>
 <li>Log viewer: <code>logs-toggle</code>, <code>log-panel</code>.</li>
 </ul>
 <h2>Invariants</h2>
@@ -89,7 +93,8 @@ The effective API is the id/class contract with <code>app.js</code>:</p>
 <li><strong>Buttons start disabled where <code>app.js</code> requires it</strong> (copy, download,
   summarize, the provider picker, the auto-summarize checkbox, and the whole
   injection-benchmark control set — the injection toggle, insertion point,
-  model/judge pickers, and Run); the script enables them as state allows.</li>
+  difficulty picker, re-roll, model/judge pickers, and Run); the script
+  enables them as state allows.</li>
 <li><strong>The result section is hidden until the first transcript</strong> — fresh fetch
   and saved-row display both render into this same single panel. The
   injection panel is a child of it, so it is hidden until a transcript is
@@ -124,6 +129,12 @@ humanized server log lines.</p>
   layered oracle: the models multi-select, the judge select, and the
   per-model tally table + result rows that the canary/judge/human verdicts
   populate).</li>
+<li><code>benchmark-difficulty-picker</code> <strong>decision 2</strong> (the Difficulty select joins
+  the control row after the insertion-point select, with a selectable
+  "Manual payload" placeholder — not <code>disabled</code>, so the deselect path is
+  usable) and <strong>decision 4</strong> (the picker and re-roll reuse the existing
+  <code>benchmark-label</code>/<code>btn</code> classes, and the hidden <code>difficulty-error</code> status
+  line sits beside them).</li>
 </ul>
 <h2>Cross-links</h2>
 <ul>

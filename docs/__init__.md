@@ -44,6 +44,7 @@ object `app.main.app`.
 | [`fetchers.py`](fetchers.html) | caption-track fetchers (primary + fallback) and text cleaning |
 | [`urls.py`](urls.html) | YouTube URL/ID parsing (pure, no network) |
 | [`errors.py`](errors.html) | error taxonomy (code + HTTP status + message) |
+| [`benchmark_dataset.py`](benchmark_dataset.html) | benchmark dataset: path resolution, parsing, random pick |
 | [`persist.py`](persist.html) | title-to-file-name derivation + best-effort transcript writer |
 | [`library.py`](library.html) | read side of saved transcripts (list + read) |
 | [`providers.py`](providers.html) | summarization provider config (read per request) |

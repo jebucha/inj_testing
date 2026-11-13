@@ -24,7 +24,9 @@ third-party transcript service.
   read endpoints add `INVALID_NAME` 400 and `NOT_FOUND` 404; summarization
   adds `NOT_CONFIGURED` 503, `INVALID_PROVIDER` 400, `PROVIDER_ERROR` 502,
   and `INPUT_TOO_LONG` 400; the injection benchmark's non-persisting
-  `POST /api/llm-call` endpoint adds `INVALID_PRESET` 400. Any request whose
+  `POST /api/llm-call` endpoint adds `INVALID_PRESET` 400, and its
+  difficulty picker adds `INVALID_DIFFICULTY` 400 and `DATASET_MISSING`
+  404. Any request whose
   `Content-Length` exceeds 5 MiB is rejected before parsing with 413
   `BODY_TOO_LARGE`, regardless of route.
 - **Concurrency:** at most one YouTube fetch chain at a time; a second
@@ -210,7 +212,7 @@ re-read on every request, so edits take effect without a restart. Shape:
 | Variable | Read by | Default | Meaning |
 | --- | --- | --- | --- |
 | `PROVIDERS_CONFIG` | the app (inside the container) | `providers.json` in the working directory (`/app/providers.json` in the image) | path to the provider config file |
-| `SUMMARY_TIMEOUT` | the app | `120` | backend-call timeout in seconds (connect + read), sized for local 27B-class models; raise it for slower hardware |
+| `SUMMARY_TIMEOUT` | the app | `300` | backend-call timeout in seconds (connect + read), the default is sized for slower local inference hardware; lower it for fast backends or raise it further if needed |
 
 With compose, the host-side config path is overridable through the
 uncommitted `.env` file: `PROVIDERS_CONFIG=/etc/inj-testing/providers.json`
@@ -306,6 +308,9 @@ library), tick the **Injection** toggle in the result panel. This reveals:
 - **Insertion point** — `Prepend` (top), `Middle` (near the center, on a
   line boundary), or `Append` (bottom, the default). A live preview shows
   the exact spliced text that will be sent.
+- **Difficulty** — a picker to seed the payload field from the committed
+  benchmark dataset instead of typing one: `Manual payload` (the default),
+  `Easy`, `Medium`, or `Hard`. See the subsection below.
 - **Models** — a multi-select of every configured provider/model; pick one
   or more targets (Ctrl/Cmd-click to select several).
 - **Judge** — a single provider/model that acts as the LLM-as-judge oracle
@@ -321,6 +326,22 @@ the non-persisting `POST /api/llm-call` endpoint, so **no `.summary` file is
 ever created or modified** — the saved-transcript list is untouched. System
 prompts come only from a server-side preset registry (`summarize` for
 delivery, `judge` for judging); the client cannot supply its own.
+
+**Difficulty picker.** Instead of typing a payload, you can seed the payload
+field from the committed benchmark dataset: `data/benchmark.jsonl` holds 153
+self-contained prompt-injection scenarios tagged `easy` / `medium` / `hard`.
+Selecting a difficulty fetches a random prompt of that difficulty from the
+server (`GET /api/benchmarks`) and puts it into the payload field — where it
+becomes the payload for the run, exactly as if you had typed it (the preview
+shows the spliced text). **Re-roll** fetches a fresh random prompt for the
+same difficulty. The picker and re-roll are disabled while a benchmark run
+is in flight and need a displayed transcript; re-roll is additionally
+disabled while the placeholder is selected. "Manual payload" is a no-op
+deselect: it only stops the result rows from showing a dataset id, never
+touching the payload field. On a failed fetch (e.g. the dataset is absent)
+an error shows next to the picker and the payload/run state is untouched.
+Each completed run's result rows show the dataset entry's id that seeded
+the run (nothing for a manually typed payload).
 
 **The layered oracle.** Each model's result is scored three ways, so you can
 trust the deterministic layer when it fires and use the others when it does
@@ -355,7 +376,12 @@ the same payload can target a new carrier).
 
 **Error messages.** `INVALID_PRESET` 400 — the requested preset id is not in
 the server-side registry (the UI only ever sends registered presets, so this
-appears only for hand-crafted requests). Otherwise the summarization codes
+appears only for hand-crafted requests). `INVALID_DIFFICULTY` 400 — the
+difficulty picker's `difficulty` parameter is not one of `easy`/`medium`/
+`hard` (the UI only sends those, so this appears only for hand-crafted
+requests). `DATASET_MISSING` 404 — the benchmark dataset is absent or has no
+entries for the difficulty (the picker shows the error message beside it).
+Otherwise the summarization codes
 apply: `NOT_CONFIGURED` 503, `INVALID_PROVIDER` 400, `PROVIDER_ERROR` 502,
 `INPUT_TOO_LONG` 400.
 
@@ -407,6 +433,7 @@ app/                      FastAPI application
   fetchers.py             primary (youtube-transcript-api) + fallback (yt-dlp) + text cleaning
   urls.py                 YouTube URL/ID parsing (no network)
   errors.py               error taxonomy (code + HTTP status + message)
+  benchmark_dataset.py    benchmark dataset: path resolution, parsing, random pick
   persist.py              title-to-file-name derivation + best-effort transcript writer
   library.py              read side of saved transcripts (list + read)
   providers.py            summarization provider config (read per request)
@@ -417,6 +444,7 @@ app/                      FastAPI application
   log.py                  structlog JSON-to-stdout setup
   logbus.py               in-memory ring buffer backing the SSE log viewer
   static/                 index.html, style.css, app.js (no build step, no CDN)
+data/           benchmark dataset (data/benchmark.jsonl; consumed by GET /api/benchmarks)
 tests/          unit/API/logging tests + tests/e2e (Playwright, dev-only)
 docs/           per-file code documentation (open docs/index.html in a browser)
 ```

@@ -21,7 +21,7 @@ a recording stub while `summarize_with_provider` keeps running for real.
   `<name>.summary`.
 - `read_summary(name) -> tuple[bool, str]` — contained read of
   `<name>.summary`.
-- `summary_timeout() -> float` — `SUMMARY_TIMEOUT` (default 120 s) read at
+- `summary_timeout() -> float` — `SUMMARY_TIMEOUT` (default 300 s) read at
   call time; non-numeric values fall back to the default.
 - `call_with_preset(provider, model, preset_id, text, timeout=None) -> str`
   — the injection benchmark's non-persisting call: builds
@@ -35,7 +35,7 @@ a recording stub while `summarize_with_provider` keeps running for real.
   `reason` (`unreachable`, `timeout`, `http_error`, `malformed_response`,
   `empty_response`) and a safe, app-constructed `detail`.
 - Constants: `MAX_OUTPUT_TOKENS` (16384), `MAX_INPUT_CHARS` (100,000),
-  `DEFAULT_SUMMARY_TIMEOUT` (120.0), `SUMMARY_INSTRUCTION` (the fixed,
+  `DEFAULT_SUMMARY_TIMEOUT` (300.0), `SUMMARY_INSTRUCTION` (the fixed,
   server-side summarization prompt), `JUDGE_INSTRUCTION` (the fixed,
   server-side judge prompt: first line exactly `resisted` / `partial` /
   `full`, then a brief reason), `SUMMARY_EXTENSION` (`.summary`).

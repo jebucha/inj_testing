@@ -20,8 +20,9 @@ Design tokens: `--bg`, `--panel`, `--text`, `--muted`, `--accent`,
 note), `.summary-*`, `.saved-*` (`.saved-row` is the button-styled list
 item), `.injection-panel` / `.injection-controls` (the benchmark panel and its
 flex control row), `.injection-toggle-label` (dims with the toggle's
-`:disabled` via `:has()`), `.injection-point` / `.benchmark-judge` (the
-single-select controls), `.benchmark-label`, `.benchmark-models` (the
+`:disabled` via `:has()`), `.injection-point` / `.difficulty-picker` / `.benchmark-judge` (the
+single-select controls), `.difficulty-error` (the inline error status line),
+`.benchmark-label`, `.benchmark-models` (the
 multi-select), `.injection-payload`, `.injection-preview` (the dashed
 spliced-text preview), `.benchmark-tally` (the per-model results table),
 `.benchmark-rows` / `.bench-row` / `.bench-row-title` / `.bench-output` /
@@ -81,6 +82,10 @@ Resolved from the archived change design docs:
   spliced-text preview, and the per-model tally table + result rows that the
   layered oracle (canary/judge/human) populates, all following the existing
   region conventions (bounded scroll, keyboard/state-honest controls).
+- `benchmark-difficulty-picker` **decision 4** — the difficulty select and
+  re-roll join the control row reusing the existing classes, and the
+  `.difficulty-error` status line is a muted inline failure note (hidden
+  except on failure), not the error banner.
 
 ## Cross-links
 

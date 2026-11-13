@@ -24,8 +24,8 @@ that map module results onto JSON responses.
 - Endpoints: `POST /api/transcript`, `GET /api/transcripts`,
   `GET /api/transcripts/{name}`, `GET /api/transcripts/{name}/summary`,
   `GET /api/providers`, `POST /api/summarize`, `POST /api/llm-call`,
-  `GET /api/settings`, `POST /api/settings`, `GET /api/logs` (SSE), and
-  the static UI mounted at `/`.
+  `GET /api/benchmarks`, `GET /api/settings`, `POST /api/settings`,
+  `GET /api/logs` (SSE), and the static UI mounted at `/`.
 
 ## Invariants
 
@@ -57,7 +57,16 @@ that map module results onto JSON responses.
   overlong text (`400 INPUT_TOO_LONG`).
 - **Read endpoints never touch the fetch chain or its semaphore.** Listing,
   reading transcripts/summaries, listing providers, reading/writing the
-  settings, and streaming logs are all independent of in-flight fetches.
+  settings, the benchmark dataset pick, and streaming logs are all
+  independent of in-flight fetches.
+- **`GET /api/benchmarks` is read-only and dataset-driven.** The difficulty
+  picker's endpoint: the difficulty is validated first, then
+  `app/benchmark_dataset.py` resolves `BENCHMARK_DATASET` (default
+  `data/benchmark.jsonl`, CWD-relative) at call time, parses the file, and
+  picks one random entry of the requested difficulty inside
+  `asyncio.to_thread`, returning `{"id", "difficulty", "prompt"}`. It
+  creates or modifies no file and never touches the fetch chain or its
+  semaphore.
 - **Provider config is read per request** (never at startup); the
   `GET /api/providers` response is secret-free — API keys and base URLs never
   leave the server.
@@ -85,6 +94,9 @@ validated before any filesystem access: a non-object body or a
 missing/non-boolean `autoSummarize` is rejected without touching the disk.
 `POST /api/llm-call` adds `400 INVALID_PRESET` (unknown preset id,
 checked before any provider read or backend call).
+`GET /api/benchmarks` adds `400 INVALID_DIFFICULTY` (unknown/missing
+difficulty, checked before any filesystem access) and `404 DATASET_MISSING`
+(dataset absent, unreadable, or no valid entry for the difficulty).
 
 ## Design decisions
 
@@ -118,6 +130,11 @@ Resolved from the archived change design docs:
   primitive for delivery and judge, server-side preset registry instead of
   client prompt text), reusing `SUMMARIZE_EXECUTOR` and the 100k-char cap
   (decision 4) with the rejection order of decision 6.
+- `benchmark-difficulty-picker` **decision 1** — `GET /api/benchmarks`:
+  the read-only, difficulty-filtered random pick backed by
+  `app/benchmark_dataset.py` (new module, no FastAPI imports), dispatched
+  with `asyncio.to_thread`, never touching the fetch chain or the
+  single-flight semaphore.
 
 ## Cross-links
 
@@ -125,6 +142,7 @@ Resolved from the archived change design docs:
 - [`errors.py`](errors.html) — the error taxonomy it maps to HTTP
 - [`persist.py`](persist.html) / [`library.py`](library.html) — write and read side of transcripts
 - [`providers.py`](providers.html) / [`summarize.py`](summarize.html) — the summarization feature
+- [`benchmark_dataset.py`](benchmark_dataset.html) — the dataset pick behind `GET /api/benchmarks`
 - [`settings.py`](settings.html) — the `GET`/`POST /api/settings` persistence
 - [`log.py`](log.html) / [`logbus.py`](logbus.html) — logging setup and the SSE source
 - [`app/static/app.js`](static/app-js.html) — the UI that consumes these endpoints

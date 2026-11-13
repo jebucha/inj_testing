@@ -26,5 +26,5 @@
 ## Workflow follow-up
 
 - [x] Bump the app minor version (`uv version --bump minor`) before archiving — the change is user-visible.
-- [ ] Validate the implemented change in a fresh session with a model that did not write the code (`openspec-validate-change`), report under `openspec/changes/benchmark-difficulty-picker/validations/`.
+- [x] Validate the implemented change in a fresh session with a model that did not write the code (`openspec-validate-change`), report under `openspec/changes/benchmark-difficulty-picker/validations/`.
 - [ ] Archive the change once validation passes.

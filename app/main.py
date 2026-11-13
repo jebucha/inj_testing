@@ -59,7 +59,7 @@ DEFAULT_PORT = 8000
 LOG_POLL_TIMEOUT = 0.5
 
 # Max concurrent summarization backend calls. Each call pins a worker for up
-# to the 120 s LLM timeout, so it runs on a bounded pool of its own rather
+# to the 300 s LLM timeout, so it runs on a bounded pool of its own rather
 # than the default executor every other endpoint's blocking work shares;
 # excess in-flight requests wait for a free slot instead of being rejected.
 SUMMARIZE_MAX_CONCURRENCY = 2
@@ -68,7 +68,7 @@ SUMMARIZE_EXECUTOR = ThreadPoolExecutor(
 )
 
 # Max concurrent model-discovery calls (GET /models). Discovery gets its own
-# bounded pool rather than SUMMARIZE_EXECUTOR (design D6): a 120 s summarize
+# bounded pool rather than SUMMARIZE_EXECUTOR (design D6): a 300 s summarize
 # must not block a fast /models call, and a hanging discovery must not starve
 # summarization.
 DISCOVERY_MAX_CONCURRENCY = 2

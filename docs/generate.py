@@ -20,7 +20,7 @@ import markdown
 DOCS_DIR = Path(__file__).resolve().parent
 
 # (nav label, markdown path, output path) — the landing page first, then the
-# 15 Python module pages (flat), the 3 static UI pages (static/), the 2
+# 16 Python module pages (flat), the 3 static UI pages (static/), the 2
 # deployment config pages (deploy/), and the provider config template page.
 PAGES = [
     ("index", "index.md", "index.html"),
@@ -30,6 +30,7 @@ PAGES = [
     ("app/fetchers.py", "fetchers.md", "fetchers.html"),
     ("app/urls.py", "urls.md", "urls.html"),
     ("app/errors.py", "errors.md", "errors.html"),
+    ("app/benchmark_dataset.py", "benchmark_dataset.md", "benchmark_dataset.html"),
     ("app/persist.py", "persist.md", "persist.html"),
     ("app/library.py", "library.md", "library.html"),
     ("app/providers.py", "providers.md", "providers.html"),

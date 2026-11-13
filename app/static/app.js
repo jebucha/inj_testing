@@ -67,7 +67,11 @@
     MODEL_NOT_REMOVABLE:
       "That model comes from the provider config file, so it cannot be removed from the UI. Edit the config file instead.",
     NOT_FOUND:
-      "That model is not configured for this provider."
+      "That model is not configured for this provider.",
+    INVALID_DIFFICULTY:
+      "Unknown difficulty — it must be one of: easy, medium, hard.",
+    DATASET_MISSING:
+      "The benchmark dataset is missing or has no entries for that difficulty."
   };
 
   // Discovery-specific failure message (design D7): a failed refresh must
@@ -124,7 +128,9 @@
   // ("" = manual entry). Captured into each run's results at run time so the
   // result rows can display it (design decision 3); cleared when the user
   // deselects to "Manual payload" — manual edits to the payload field do
-  // not clear it (the payload was still seeded by that entry).
+  // not clear it (the payload was still seeded by that entry). Deliberately
+  // not reset by clearBenchmark(): the id belongs to the payload (which
+  // clearBenchmark keeps for the new transcript), not to the transcript.
   var benchmarkDatasetId = "";
 
   function setBusy(busy) {

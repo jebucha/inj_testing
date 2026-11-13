@@ -18,11 +18,15 @@ ids it requires from `index.html`: `url-input`, `fetch-form`, `fetch-btn`,
 `summarize-spinner`, `summary-panel`, `summary-text`, `summary-copy-btn`,
 `auto-summarize`, `auto-summarize-note`, `injection-panel`,
 `injection-toggle`, `injection-toggle-label`, `injection-point`,
-`injection-payload`, `injection-preview`, `benchmark-models`,
+`injection-payload`, `injection-preview`, `difficulty-picker`,
+`benchmark-reroll`, `difficulty-error`, `benchmark-models`,
 `benchmark-judge`, `benchmark-run`, `benchmark-spinner`, `benchmark-label`,
 `benchmark-results`, `benchmark-tally`, `benchmark-rows`, `log-panel`,
 `logs-toggle`. It also defines the `ERROR_MESSAGES` map (server error code
-→ human message) for the nine taxonomy codes.
+→ human message) for the eleven taxonomy codes plus `NOT_FOUND`; the
+dataset-pick errors (`INVALID_DIFFICULTY`, `DATASET_MISSING`) surface via
+`messageFor`'s server-message fallback into the `difficulty-error` status
+line.
 
 ## Invariants
 
@@ -141,6 +145,32 @@ ids it requires from `index.html`: `url-input`, `fetch-form`, `fetch-btn`,
   select shares the same option list as the multi-select and defaults to the
   same target the summarize picker pre-selects.
 
+### Dataset difficulty picker invariants
+
+- **The dataset difficulty picker seeds the payload field** (design decision
+  2). Selecting a difficulty fetches a random entry of that difficulty from
+  `GET /api/benchmarks`, puts its prompt into `#injection-payload` (a
+  plain-text assignment), stores the entry id, and checks the injection
+  toggle when its existing rules allow (a transcript is displayed) —
+  explicitly calling `updateBenchmarkEnabled()` afterwards, since a
+  programmatic `checked` assignment fires no change event. "Manual payload"
+  is a no-op deselect: it clears only the stored entry id and never touches
+  the payload field. The re-roll control re-fetches for the currently
+  selected difficulty (re-selecting the same option fires no change event).
+  The picker and the re-roll join `updateBenchmarkEnabled`'s governance: the
+  picker needs a displayed transcript and no in-flight run; the re-roll
+  additionally needs a dataset difficulty selected. On a failed fetch the
+  error shows in the `#difficulty-error` status line and any check *this
+  fetch* made is undone (a pre-existing check is never touched), so the
+  existing enable logic keeps "Run benchmark" disabled in the fresh-panel
+  case (a transcript displayed, no models selected).
+- **Each result row shows the dataset entry id that seeded the run**
+  (design decision 3). The stored id is captured at run time into each run's
+  results and rendered as a plain-text meta line next to the canary span;
+  manual edits to the payload field do not clear it (the payload was still
+  seeded by that entry), and runs with no stored id render nothing.
+  Everything renders as plain text, like the rest of the panel.
+
 ## Log events emitted
 
 None (browser code). It *formats* server events for the panel via
@@ -156,8 +186,13 @@ None (browser code). It *formats* server events for the panel via
 
 `INVALID_URL`, `VIDEO_UNAVAILABLE`, `NO_CAPTIONS`, `UPSTREAM_FAILURE`,
 `BUSY`, `NOT_CONFIGURED`, `INVALID_PROVIDER`, `PROVIDER_ERROR`,
-`INPUT_TOO_LONG` — via the `ERROR_MESSAGES` map (preferred over the server
-message); network failures and unexpected shapes get a generic message.
+`INPUT_TOO_LONG`, `INVALID_MODEL`, `MODEL_NOT_REMOVABLE`, and `NOT_FOUND` —
+via the `ERROR_MESSAGES` map (preferred over the server message); network
+failures and unexpected shapes get a generic message. The dataset pick's
+`INVALID_DIFFICULTY` / `DATASET_MISSING` surface via `messageFor`'s
+server-message fallback into the `difficulty-error` status line (the map
+has no entries for them — the server messages are the stable UI contract
+for these codes).
 
 ## Design decisions
 
@@ -190,9 +225,16 @@ Resolved from the archived change design docs:
   the client sends a `preset` id, no system text), **decision 5** (the
   layered oracle: per-run canary token + judge over the original unspliced
   transcript + settable human verdict, with the per-model tally semantics).
+- `benchmark-difficulty-picker` **decision 2** (the picker and re-roll
+  seed the payload field, the selectable "Manual payload" placeholder is a
+  no-op deselect, the explicit `updateBenchmarkEnabled()` call, and the
+  failed-fetch undo that keeps the fresh-panel run button disabled) and
+  **decision 3** (the stored entry id is captured at run time and rendered
+  on each result row; manual edits do not clear it).
 
 ## Cross-links
 
 - [`index.html`](index-html.html) — the DOM it wires up
 - [`style.css`](style-css.html) — the classes it toggles
 - [`main.html`](../main.html) — the endpoints it consumes
+- [`benchmark_dataset.html`](../benchmark_dataset.html) — the dataset pick behind the difficulty picker

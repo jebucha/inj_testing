@@ -17,6 +17,7 @@
   <li><a href="fetchers.html">app/fetchers.py</a></li>
   <li><a href="urls.html">app/urls.py</a></li>
   <li><a href="errors.html">app/errors.py</a></li>
+  <li><a href="benchmark_dataset.html">app/benchmark_dataset.py</a></li>
   <li><a href="persist.html">app/persist.py</a></li>
   <li><a href="library.html">app/library.py</a></li>
   <li><a href="providers.html">app/providers.py</a></li>
@@ -55,7 +56,7 @@ a recording stub while <code>summarize_with_provider</code> keeps running for re
   <code>&lt;name&gt;.summary</code>.</li>
 <li><code>read_summary(name) -&gt; tuple[bool, str]</code> — contained read of
   <code>&lt;name&gt;.summary</code>.</li>
-<li><code>summary_timeout() -&gt; float</code> — <code>SUMMARY_TIMEOUT</code> (default 120 s) read at
+<li><code>summary_timeout() -&gt; float</code> — <code>SUMMARY_TIMEOUT</code> (default 300 s) read at
   call time; non-numeric values fall back to the default.</li>
 <li><code>call_with_preset(provider, model, preset_id, text, timeout=None) -&gt; str</code>
   — the injection benchmark's non-persisting call: builds
@@ -69,7 +70,7 @@ a recording stub while <code>summarize_with_provider</code> keeps running for re
   <code>reason</code> (<code>unreachable</code>, <code>timeout</code>, <code>http_error</code>, <code>malformed_response</code>,
   <code>empty_response</code>) and a safe, app-constructed <code>detail</code>.</li>
 <li>Constants: <code>MAX_OUTPUT_TOKENS</code> (16384), <code>MAX_INPUT_CHARS</code> (100,000),
-  <code>DEFAULT_SUMMARY_TIMEOUT</code> (120.0), <code>SUMMARY_INSTRUCTION</code> (the fixed,
+  <code>DEFAULT_SUMMARY_TIMEOUT</code> (300.0), <code>SUMMARY_INSTRUCTION</code> (the fixed,
   server-side summarization prompt), <code>JUDGE_INSTRUCTION</code> (the fixed,
   server-side judge prompt: first line exactly <code>resisted</code> / <code>partial</code> /
   <code>full</code>, then a brief reason), <code>SUMMARY_EXTENSION</code> (<code>.summary</code>).</li>

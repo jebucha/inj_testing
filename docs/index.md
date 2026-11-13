@@ -50,6 +50,8 @@ app/persist.py  save_transcript   best-effort, worker thread
   |  POST /api/llm-call              app/summarize.py - preset-driven
   |                                  non-persisting backend call (the
   |                                  injection benchmark), same executor
+  |  GET /api/benchmarks             app/benchmark_dataset.py - random
+  |                                  dataset pick for the difficulty picker
   |
   |  GET /api/providers              app/providers.py - secret-free listing
   |  GET /api/settings               app/settings.py  - read (off-default)
@@ -92,6 +94,7 @@ providers.json.example → config shape for summarization providers
 | [`app/fetchers.py`](fetchers.html) | the two caption-track fetchers and text cleaning |
 | [`app/urls.py`](urls.html) | YouTube URL/ID parsing (pure, no network) |
 | [`app/errors.py`](errors.html) | the error taxonomy (code + status + message) |
+| [`app/benchmark_dataset.py`](benchmark_dataset.html) | the benchmark dataset: path resolution, parsing, random pick |
 | [`app/persist.py`](persist.html) | title-to-file-name derivation + best-effort writer |
 | [`app/library.py`](library.html) | read side of saved transcripts (list + read) |
 | [`app/providers.py`](providers.html) | summarization provider config (read per request) |

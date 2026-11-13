@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>app/benchmark_dataset.py — inj-testing code docs</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<nav class="sidebar">
+<h1>inj-testing docs</h1>
+<ul>
+  <li><a href="index.html">index</a></li>
+  <li><a href="__init__.html">app/__init__.py</a></li>
+  <li><a href="main.html">app/main.py</a></li>
+  <li><a href="chain.html">app/chain.py</a></li>
+  <li><a href="fetchers.html">app/fetchers.py</a></li>
+  <li><a href="urls.html">app/urls.py</a></li>
+  <li><a href="errors.html">app/errors.py</a></li>
+  <li><a href="benchmark_dataset.html" aria-current="page">app/benchmark_dataset.py</a></li>
+  <li><a href="persist.html">app/persist.py</a></li>
+  <li><a href="library.html">app/library.py</a></li>
+  <li><a href="providers.html">app/providers.py</a></li>
+  <li><a href="summarize.html">app/summarize.py</a></li>
+  <li><a href="provider_overrides.html">app/provider_overrides.py</a></li>
+  <li><a href="model_discovery.html">app/model_discovery.py</a></li>
+  <li><a href="settings.html">app/settings.py</a></li>
+  <li><a href="log.html">app/log.py</a></li>
+  <li><a href="logbus.html">app/logbus.py</a></li>
+  <li><a href="static/app-js.html">app/static/app.js</a></li>
+  <li><a href="static/index-html.html">app/static/index.html</a></li>
+  <li><a href="static/style-css.html">app/static/style.css</a></li>
+  <li><a href="deploy/Dockerfile.html">Dockerfile</a></li>
+  <li><a href="deploy/compose-yml.html">docker-compose.yml</a></li>
+  <li><a href="providers-json-example.html">providers.json.example</a></li>
+</ul>
+</nav>
+<main class="content">
+<h1><code>app/benchmark_dataset.py</code> — the benchmark dataset</h1>
+<h2>Purpose</h2>
+<p>The dataset side of the injection benchmark's difficulty picker: resolving
+the dataset file path, parsing <code>data/benchmark.jsonl</code>, and picking one
+random entry of a requested difficulty. It has no FastAPI imports — the
+functions are pure over the dataset file path so they are testable directly
+against <code>tmp_path</code>. <code>app/main.py</code> wraps <code>select_entry</code> in
+<code>asyncio.to_thread</code> for the read-only <code>GET /api/benchmarks</code> endpoint.</p>
+<h2>Public surface</h2>
+<ul>
+<li><code>dataset_path() -&gt; Path</code> — resolves the dataset file path at call time:
+  env var <code>BENCHMARK_DATASET</code> (same pattern as <code>TRANSCRIPT_DIR</code> and
+  <code>PROVIDERS_CONFIG</code>), default <code>data/benchmark.jsonl</code> — CWD-relative,
+  exactly like <code>PROVIDERS_CONFIG</code>'s <code>providers.json</code> default (locally the
+  app runs from the repo root; in the container the WORKDIR is <code>/app</code> with
+  <code>COPY data ./data</code>, so it resolves to <code>/app/data/benchmark.jsonl</code>).</li>
+<li><code>DIFFICULTIES</code> — the frozenset of valid difficulty tags: <code>easy</code>,
+  <code>medium</code>, <code>hard</code>.</li>
+<li><code>select_entry(difficulty) -&gt; dict</code> — validates the difficulty, reads and
+  parses the file, filters to matching entries, and returns one random
+  pick as exactly <code>{"id", "difficulty", "prompt"}</code>.</li>
+</ul>
+<h2>Invariants</h2>
+<ul>
+<li><strong>Read-only.</strong> The file is only ever opened for reading (<code>"r"</code>); the
+  module creates or modifies nothing — a dataset pick can never pollute the
+  filesystem.</li>
+<li><strong>The dataset is read on every call, never at startup.</strong> A file that
+  changes, appears, or disappears takes effect on the next request; a
+  corrupted file degrades to a dataset-missing error rather than an
+  exception.</li>
+<li><strong>Difficulty validation happens before any filesystem access.</strong> A missing
+  or unknown difficulty raises <code>InvalidDifficultyError</code> (400) before the
+  file is opened.</li>
+<li><strong>Corrupted lines are skipped, not fatal.</strong> Lines that fail to parse, are
+  not JSON objects, or lack a non-empty string <code>id</code>/<code>difficulty</code>/<code>prompt</code>
+  are dropped; if that leaves no entries for the difficulty, the result is
+  <code>DatasetMissingError</code> (404) rather than a 500.</li>
+<li><strong>No blocking I/O on the event loop.</strong> The module itself is synchronous;
+  <code>app/main.py</code> dispatches the call with <code>asyncio.to_thread</code>.</li>
+<li><strong>No single-flight.</strong> The dataset pick never touches the fetch chain's
+  semaphore (read path, per AGENTS.md).</li>
+<li><strong>The dataset is a committed data asset.</strong> No authoring, upload, or
+  editing; the file ships in the repo and is copied into the image by the
+  Dockerfile.</li>
+</ul>
+<h2>Log events emitted</h2>
+<p>None.</p>
+<h2>Error codes raised/handled</h2>
+<ul>
+<li><code>InvalidDifficultyError</code> (400 <code>INVALID_DIFFICULTY</code>) — the difficulty is
+  missing or not one of <code>easy</code>/<code>medium</code>/<code>hard</code>.</li>
+<li><code>DatasetMissingError</code> (404 <code>DATASET_MISSING</code>) — the file is absent,
+  unreadable, or its valid lines leave no entry for the difficulty.</li>
+</ul>
+<h2>Design decisions</h2>
+<p>Resolved from the archived change design docs:</p>
+<ul>
+<li><code>benchmark-difficulty-picker</code> <strong>decision 1</strong> — the call-time path
+  resolution (<code>BENCHMARK_DATASET</code>, CWD-relative default, the
+  <code>TRANSCRIPT_DIR</code> / <code>PROVIDERS_CONFIG</code> pattern), read-per-request
+  semantics, the skip-malformed-lines rule, and the server-side random pick
+  (the browser never needs the full dataset).</li>
+</ul>
+<h2>Cross-links</h2>
+<ul>
+<li><a href="main.html"><code>main.py</code></a> — the <code>GET /api/benchmarks</code> endpoint wrapping this</li>
+<li><a href="errors.html"><code>errors.py</code></a> — the two taxonomy codes it raises</li>
+<li><a href="static/app-js.html"><code>static/app-js.html</code></a> — the picker that fetches it</li>
+</ul>
+</main>
+</body>
+</html>

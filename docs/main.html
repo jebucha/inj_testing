@@ -17,6 +17,7 @@
   <li><a href="fetchers.html">app/fetchers.py</a></li>
   <li><a href="urls.html">app/urls.py</a></li>
   <li><a href="errors.html">app/errors.py</a></li>
+  <li><a href="benchmark_dataset.html">app/benchmark_dataset.py</a></li>
   <li><a href="persist.html">app/persist.py</a></li>
   <li><a href="library.html">app/library.py</a></li>
   <li><a href="providers.html">app/providers.py</a></li>
@@ -58,8 +59,8 @@ that map module results onto JSON responses.</p>
 <li>Endpoints: <code>POST /api/transcript</code>, <code>GET /api/transcripts</code>,
   <code>GET /api/transcripts/{name}</code>, <code>GET /api/transcripts/{name}/summary</code>,
   <code>GET /api/providers</code>, <code>POST /api/summarize</code>, <code>POST /api/llm-call</code>,
-  <code>GET /api/settings</code>, <code>POST /api/settings</code>, <code>GET /api/logs</code> (SSE), and
-  the static UI mounted at <code>/</code>.</li>
+  <code>GET /api/benchmarks</code>, <code>GET /api/settings</code>, <code>POST /api/settings</code>,
+  <code>GET /api/logs</code> (SSE), and the static UI mounted at <code>/</code>.</li>
 </ul>
 <h2>Invariants</h2>
 <ul>
@@ -91,7 +92,16 @@ that map module results onto JSON responses.</p>
   overlong text (<code>400 INPUT_TOO_LONG</code>).</li>
 <li><strong>Read endpoints never touch the fetch chain or its semaphore.</strong> Listing,
   reading transcripts/summaries, listing providers, reading/writing the
-  settings, and streaming logs are all independent of in-flight fetches.</li>
+  settings, the benchmark dataset pick, and streaming logs are all
+  independent of in-flight fetches.</li>
+<li><strong><code>GET /api/benchmarks</code> is read-only and dataset-driven.</strong> The difficulty
+  picker's endpoint: the difficulty is validated first, then
+  <code>app/benchmark_dataset.py</code> resolves <code>BENCHMARK_DATASET</code> (default
+  <code>data/benchmark.jsonl</code>, CWD-relative) at call time, parses the file, and
+  picks one random entry of the requested difficulty inside
+  <code>asyncio.to_thread</code>, returning <code>{"id", "difficulty", "prompt"}</code>. It
+  creates or modifies no file and never touches the fetch chain or its
+  semaphore.</li>
 <li><strong>Provider config is read per request</strong> (never at startup); the
   <code>GET /api/providers</code> response is secret-free — API keys and base URLs never
   leave the server.</li>
@@ -115,7 +125,10 @@ to its <code>status</code>/<code>code</code>/<code>message</code> JSON envelope.
 validated before any filesystem access: a non-object body or a
 missing/non-boolean <code>autoSummarize</code> is rejected without touching the disk.
 <code>POST /api/llm-call</code> adds <code>400 INVALID_PRESET</code> (unknown preset id,
-checked before any provider read or backend call).</p>
+checked before any provider read or backend call).
+<code>GET /api/benchmarks</code> adds <code>400 INVALID_DIFFICULTY</code> (unknown/missing
+difficulty, checked before any filesystem access) and <code>404 DATASET_MISSING</code>
+(dataset absent, unreadable, or no valid entry for the difficulty).</p>
 <h2>Design decisions</h2>
 <p>Resolved from the archived change design docs:</p>
 <ul>
@@ -147,6 +160,11 @@ checked before any provider read or backend call).</p>
   primitive for delivery and judge, server-side preset registry instead of
   client prompt text), reusing <code>SUMMARIZE_EXECUTOR</code> and the 100k-char cap
   (decision 4) with the rejection order of decision 6.</li>
+<li><code>benchmark-difficulty-picker</code> <strong>decision 1</strong> — <code>GET /api/benchmarks</code>:
+  the read-only, difficulty-filtered random pick backed by
+  <code>app/benchmark_dataset.py</code> (new module, no FastAPI imports), dispatched
+  with <code>asyncio.to_thread</code>, never touching the fetch chain or the
+  single-flight semaphore.</li>
 </ul>
 <h2>Cross-links</h2>
 <ul>
@@ -154,6 +172,7 @@ checked before any provider read or backend call).</p>
 <li><a href="errors.html"><code>errors.py</code></a> — the error taxonomy it maps to HTTP</li>
 <li><a href="persist.html"><code>persist.py</code></a> / <a href="library.html"><code>library.py</code></a> — write and read side of transcripts</li>
 <li><a href="providers.html"><code>providers.py</code></a> / <a href="summarize.html"><code>summarize.py</code></a> — the summarization feature</li>
+<li><a href="benchmark_dataset.html"><code>benchmark_dataset.py</code></a> — the dataset pick behind <code>GET /api/benchmarks</code></li>
 <li><a href="settings.html"><code>settings.py</code></a> — the <code>GET</code>/<code>POST /api/settings</code> persistence</li>
 <li><a href="log.html"><code>log.py</code></a> / <a href="logbus.html"><code>logbus.py</code></a> — logging setup and the SSE source</li>
 <li><a href="static/app-js.html"><code>app/static/app.js</code></a> — the UI that consumes these endpoints</li>

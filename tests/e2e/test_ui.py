@@ -1,4 +1,4 @@
-"""E2E UI tests (T-WEB-INTERFACE-001 .. 017).
+"""E2E UI tests (T-WEB-INTERFACE-001 .. 018).
 
 A real uvicorn instance of the app runs in-process (thread) with the upstream
 fetch chain stubbed for determinism — no real YouTube traffic.
@@ -561,6 +561,70 @@ def test_result_actions_wrap_narrow(browser, server):
             )
     finally:
         context.close()
+
+
+# --- T-WEB-INTERFACE-018 ------------------------------------------------------
+# Transcript panel: compact fixed default height, native vertical resize grip,
+# internal scrolling, no persistence. The grip is a user-agent shadow element,
+# so the test asserts the observable CSS contract instead of simulating a drag.
+
+
+def _panel_height_rem(panel):
+    """Rendered (border-box) height of a panel in root-font rem units."""
+    return panel.evaluate(
+        """el => el.offsetHeight
+           / parseFloat(getComputedStyle(document.documentElement).fontSize)"""
+    )
+
+
+def test_transcript_panel_compact_and_resizable(page, server):
+    """T-WEB-INTERFACE-018"""
+    server["stub"].set_success(payload=LONG_PAYLOAD)
+
+    _fetch(page, "https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+    _wait_result(page)
+
+    panel = page.locator("#transcript-panel")
+    styles = panel.evaluate(
+        """el => {
+             const root = parseFloat(getComputedStyle(document.documentElement).fontSize);
+             const cs = getComputedStyle(el);
+             return {
+               resize: cs.resize,
+               minHeightRem: parseFloat(cs.minHeight) / root,
+               clientHeight: el.clientHeight,
+               scrollHeight: el.scrollHeight,
+             };
+           }"""
+    )
+    # native vertical resize control, a 4rem floor, no max-height cap
+    assert styles["resize"] == "vertical"
+    assert styles["minHeightRem"] == pytest.approx(4.0, abs=0.05)
+    # fixed 14rem default height (border-box, so offsetHeight is the box)...
+    assert _panel_height_rem(panel) == pytest.approx(14.0, abs=0.05)
+    # ...and a long transcript scrolls inside it instead of stretching it
+    assert styles["clientHeight"] < styles["scrollHeight"]
+
+    # the panel does not grow with content height: a short transcript renders
+    # at the same fixed default height
+    server["stub"].set_success()
+    page.fill("#url-input", "https://youtu.be/aBcDeF12345")
+    page.click("#fetch-btn")
+    page.wait_for_function(
+        "() => document.getElementById('transcript-panel')"
+        ".textContent.indexOf('Transcript line number 001') === -1",
+        timeout=10_000,
+    )
+    assert _panel_height_rem(panel) == pytest.approx(14.0, abs=0.05)
+
+    # no persistence: simulate a user resize with an explicit inline height;
+    # after a page reload and a fresh fetch the panel is back at 14rem
+    panel.evaluate("el => { el.style.height = '40rem'; }")
+    assert _panel_height_rem(panel) == pytest.approx(40.0, abs=0.05)
+    page.reload()
+    _fetch(page, "https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+    _wait_result(page)
+    assert _panel_height_rem(panel) == pytest.approx(14.0, abs=0.05)
 
 
 # --- T-TRANSCRIPT-LIBRARY-016 .. 027 ------------------------------------------

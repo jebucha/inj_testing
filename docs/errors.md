@@ -2,11 +2,12 @@
 
 ## Purpose
 
-The single error taxonomy for transcript retrieval and summarization. Every
-failure the app can meaningfully report is a `TranscriptError` subclass
-carrying a machine-readable `code`, an HTTP `status`, and a stable
-human-readable `message` the UI can display. Endpoints catch `TranscriptError`
-and map it to the JSON envelope `{"error": {"code", "message"}}`.
+The single error taxonomy for transcript retrieval, summarization, and the
+benchmark dataset endpoint. Every failure the app can meaningfully report is a
+`TranscriptError` subclass carrying a machine-readable `code`, an HTTP
+`status`, and a stable human-readable `message` the UI can display. Endpoints
+catch `TranscriptError` and map it to the JSON envelope
+`{"error": {"code", "message"}}`.
 
 ## Public surface
 
@@ -22,6 +23,8 @@ and map it to the JSON envelope `{"error": {"code", "message"}}`.
 | `SummaryNotConfiguredError` | `NOT_CONFIGURED` | 503 | no usable providers in the config |
 | `InvalidProviderError` | `INVALID_PROVIDER` | 400 | provider/model no longer in the config |
 | `InvalidPresetError` | `INVALID_PRESET` | 400 | preset id not in the server-side registry |
+| `InvalidDifficultyError` | `INVALID_DIFFICULTY` | 400 | benchmark dataset difficulty not one of `easy`/`medium`/`hard` |
+| `DatasetMissingError` | `DATASET_MISSING` | 404 | the benchmark dataset is absent/unreadable, or has no entries for that difficulty |
 | `ProviderError` | `PROVIDER_ERROR` | 502 | the summarization backend failed |
 | `InputTooLongError` | `INPUT_TOO_LONG` | 400 | transcript over the 100,000-character cap |
 | `InvalidModelError` | `INVALID_MODEL` | 400 | model id violates the id rules (length, control chars) or the 50-addition cap |
@@ -72,10 +75,16 @@ Resolved from the archived change design docs:
   mirrors `INVALID_PROVIDER` for `/api/llm-call`'s server-side preset
   registry; an unknown preset is rejected before any provider config read or
   backend call.
+- `benchmark-difficulty-picker` **decision 1** — `INVALID_DIFFICULTY` 400 and
+  `DATASET_MISSING` 404 for `GET /api/benchmarks`: an unknown or missing
+  difficulty is rejected before any filesystem access, and an absent file
+  (or one whose valid lines leave no entry for the difficulty) is a
+  dataset-missing miss rather than a 500.
 
 ## Cross-links
 
 - [`chain.py`](chain.html) — where `FALLBACK_CODES` and `BusyError` matter
 - [`fetchers.py`](fetchers.html) — the primary mappers of library exceptions
 - [`summarize.py`](summarize.html) — the provider-side failures
+- [`benchmark_dataset.py`](benchmark_dataset.html) — the dataset-pick errors
 - [`main.py`](main.html) — the only place errors become HTTP responses

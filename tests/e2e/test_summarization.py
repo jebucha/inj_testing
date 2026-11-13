@@ -1,4 +1,4 @@
-"""E2E summarization tests (T-TRANSCRIPT-SUMMARIZATION-025 .. 036, 040).
+"""E2E summarization tests (T-TRANSCRIPT-SUMMARIZATION-025 .. 036, 040, 061).
 
 A real uvicorn instance of the app runs in-process (thread) with the upstream
 fetch chain stubbed (as in test_ui.py) and the summarize HTTP dispatch seam
@@ -30,6 +30,7 @@ from tests.e2e.test_ui import (
     _fetch,
     _free_port,
     _lan_ip,
+    _panel_height_rem,
     _wait_ready,
     _wait_result,
 )
@@ -58,6 +59,9 @@ PROVIDER_CONFIG = {
 }
 
 SUMMARY_TEXT = "This is the summary of the transcript."
+
+# Long enough to overflow the summary panel's 10rem default height.
+LONG_SUMMARY = "\n".join(f"Summary line number {i:03d}" for i in range(1, 16))
 
 
 def write_provider_config(path: Path, config=PROVIDER_CONFIG) -> Path:
@@ -493,3 +497,52 @@ def test_empty_summary_response_shows_no_panel(page, server):
     # ...and the page remains usable with the Summarize button re-enabled
     assert not page.locator("#summarize-btn").is_disabled()
     assert not page.locator("#fetch-btn").is_disabled()
+
+
+# --- T-TRANSCRIPT-SUMMARIZATION-061: compact resizable summary panel ----------
+# The grip is a user-agent shadow element, so the test asserts the observable
+# CSS contract instead of simulating a drag.
+
+
+def test_summary_panel_compact_and_resizable(page, server):
+    """T-TRANSCRIPT-SUMMARIZATION-061"""
+    server["stub"].set_success()
+    server["summarize_stub"].summary = LONG_SUMMARY
+    _fetch(page, VIDEO_URL)
+    _wait_result(page)
+
+    page.click("#summarize-btn")
+    _wait_summary_panel(page)
+
+    panel = page.locator("#summary-text")
+    styles = panel.evaluate(
+        """el => {
+             const root = parseFloat(getComputedStyle(document.documentElement).fontSize);
+             const cs = getComputedStyle(el);
+             return {
+               resize: cs.resize,
+               minHeightRem: parseFloat(cs.minHeight) / root,
+               clientHeight: el.clientHeight,
+               scrollHeight: el.scrollHeight,
+             };
+           }"""
+    )
+    # native vertical resize control, a 4rem floor, no max-height cap
+    assert styles["resize"] == "vertical"
+    assert styles["minHeightRem"] == pytest.approx(4.0, abs=0.05)
+    # fixed 10rem default height (border-box, so offsetHeight is the box)...
+    assert _panel_height_rem(panel) == pytest.approx(10.0, abs=0.05)
+    # ...and a long summary scrolls inside it instead of stretching it
+    assert styles["clientHeight"] < styles["scrollHeight"]
+
+    # no persistence: simulate a user resize with an explicit inline height;
+    # after a page reload and a fresh fetch + summarize the panel is back at
+    # the 10rem default
+    panel.evaluate("el => { el.style.height = '30rem'; }")
+    assert _panel_height_rem(panel) == pytest.approx(30.0, abs=0.05)
+    page.reload()
+    _fetch(page, VIDEO_URL)
+    _wait_result(page)
+    page.click("#summarize-btn")
+    _wait_summary_panel(page)
+    assert _panel_height_rem(panel) == pytest.approx(10.0, abs=0.05)
