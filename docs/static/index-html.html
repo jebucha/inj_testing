@@ -41,8 +41,9 @@
 <p>The entire web UI's markup: one page, no framework, no build step, no CDN.
 It defines the DOM contract that <code>app.js</code> consumes — every id the script
 reaches for — and the visible structure. The page is an application frame:
-an app header (the <code>inj-testing</code> brand, the "Show logs" toggle, and the log
-viewer), a left-pane navigation with two items ("Transcripts" and "Docs"),
+an app header (the <code>inj-testing</code> brand, the theme select, the "Show logs"
+toggle, and the log viewer), a left-pane navigation with two items
+("Transcripts" and "Docs"),
 and a main pane holding two view sections. The Transcripts view
 (<code>#view-transcripts</code>) contains the entire original interface — the "YouTube
 Transcript" title and subtitle, the fetch form, the error banner, the result
@@ -85,7 +86,10 @@ The effective API is the id/class contract with <code>app.js</code>:</p>
   class), <code>app-main</code>, <code>view-transcripts</code> (the Transcripts view section,
   default visible), <code>view-docs</code> (the Docs view section, <code>hidden</code> by
   default), <code>docs-toolbar</code>, <code>docs-open-new</code> (the open-in-new-window link),
-  and <code>docs-frame</code> (the iframe whose <code>src</code> is <code>/docs/</code>).</li>
+  <code>docs-frame</code> (the iframe whose <code>src</code> is <code>/docs/</code>), and the header controls:
+  <code>app-header-actions</code> (the right-aligned control group) and <code>theme-picker</code>
+  (the three-option theme select — <code>system</code>/<code>light</code>/<code>dark</code>, labeled
+  System/Light/Dark, defaulting to <code>system</code>).</li>
 </ul>
 <h2>Invariants</h2>
 <ul>
@@ -98,8 +102,11 @@ The effective API is the id/class contract with <code>app.js</code>:</p>
 <li><strong>The log panel is app-level, in the app header's second row</strong> — not
   inside either view and not at the bottom of the page flow — so opening it
   never requires scrolling and it stays available in both views. The header
-  is a column of rows (brand + toggle on the first row, panel on the
-  second), with row gap providing the spacing.</li>
+  is a column of rows (brand + the actions group — theme select, toggle —
+  on the first row, panel on the second), with row gap providing the
+  spacing. The first row is allowed to wrap at narrow viewports
+  (<code>flex-wrap</code> in the stylesheet), but it must never overflow horizontally
+  at 420px.</li>
 <li><strong>The frame is header → body row of left nav + main pane.</strong> The view
   sections live inside <code>app-main</code>; the Transcripts view is the default
   (visible) view and holds the whole original interface unchanged, including
@@ -172,6 +179,10 @@ humanized server log lines.</p>
   view-specific title/subtitle move into the Transcripts view), and <strong>D5</strong>
   (the Transcripts content moves in unchanged; view switching is a
   <code>hidden</code> toggle with the <code>aria-current</code>/<code>active</code> marker, no persistence).</li>
+<li><code>add-theme-setting</code> <strong>D6</strong> — the three-option <code>theme-picker</code> select
+  (System/Light/Dark, defaulting to <code>system</code>) in the header's actions group
+  beside the log toggle, with the row wrapping (never overflowing) at
+  narrow viewports.</li>
 </ul>
 <h2>Cross-links</h2>
 <ul>

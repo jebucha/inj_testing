@@ -39,15 +39,21 @@
 <h1><code>app/static/style.css</code> — the stylesheet</h1>
 <h2>Purpose</h2>
 <p>The single self-contained stylesheet for the UI: the design tokens
-(custom properties on <code>:root</code>), the application-frame layout (app header,
-left-pane navigation, view panes, and the narrow-viewport collapse), and the
-class styles for every region <code>app.js</code> drives. No web fonts, no CDN, no
-external references of any kind — the app's no-CDN constraint applies to CSS
-as firmly as to JS.</p>
+(custom properties on <code>:root</code>, in light and dark palettes), the
+application-frame layout (app header, left-pane navigation, view panes, and
+the narrow-viewport collapse), and the class styles for every region <code>app.js</code>
+drives. No web fonts, no CDN, no external references of any kind — the app's
+no-CDN constraint applies to CSS as firmly as to JS.</p>
 <h2>Public surface</h2>
 <p>Design tokens: <code>--bg</code>, <code>--panel</code>, <code>--text</code>, <code>--muted</code>, <code>--accent</code>,
-<code>--accent-dark</code>, <code>--error-*</code>, <code>--border</code>. Class/element contract with
-<code>index.html</code> / <code>app.js</code>: <code>.container</code> (the single 760px column),
+<code>--accent-dark</code>, <code>--error-*</code>, <code>--border</code>, and <code>--accent-tint</code> (the
+translucent accent used for hover/active fills). Each palette also sets
+<code>color-scheme</code> so the native form controls and scrollbars the browser
+renders match it. The light tokens live on <code>:root</code>; the identical dark token
+set is duplicated in <code>:root[data-theme="dark"]</code> (an explicit Dark choice)
+and inside <code>@media (prefers-color-scheme: dark)</code> over
+<code>:root:not([data-theme="light"])</code> (the system case). Class/element contract
+with <code>index.html</code> / <code>app.js</code>: <code>.container</code> (the single 760px column),
 <code>.header</code> / <code>.header-row</code>, <code>.row</code>, <code>.url-input</code>, <code>.btn</code> / <code>.btn-quiet</code>,
 <code>.spinner</code>, <code>.error-banner</code>, <code>.result-*</code>, <code>.video-title</code>,
 <code>.video-language</code>, <code>.transcript-panel</code>, <code>.provider-picker</code>,
@@ -64,8 +70,11 @@ spliced-text preview), <code>.benchmark-tally</code> (the per-model results tabl
 <code>.benchmark-rows</code> / <code>.bench-row</code> / <code>.bench-row-title</code> / <code>.bench-output</code> /
 <code>.bench-meta</code> / <code>.bench-human-label</code> / <code>.bench-human</code> (the per-model result
 rows), <code>.log-panel</code>, and the application frame: <code>.app-header</code> /
-<code>.app-header-row</code> / <code>.app-brand</code> (the brand + log-toggle row over the log
-panel), <code>.app-body</code> (the nav + main-pane row), <code>.app-nav</code> / <code>.nav-item</code> (the
+<code>.app-header-row</code> / <code>.app-brand</code> (the brand + actions row over the log
+panel), <code>.app-header-actions</code> (the right-aligned control group: the theme
+select and the log toggle), <code>.theme-picker</code> (the theme select, same select
+treatment as <code>.provider-picker</code>), <code>.app-body</code> (the nav + main-pane row),
+<code>.app-nav</code> / <code>.nav-item</code> (the
 left navigation column; <code>.nav-item.active</code> is the active-view state),
 <code>.app-main</code> (the view-pane column), <code>.view</code> (a view section), <code>#view-docs</code> /
 <code>.docs-toolbar</code> / <code>#docs-frame</code> (the Docs view: a toolbar row over an
@@ -96,12 +105,27 @@ iframe that fills the remaining pane height).</p>
   (<code>flex: 1</code>) centered items above the content, so a 420px viewport shows
   no horizontal overflow.</li>
 <li><strong>The app header is a column of rows</strong> (<code>.app-header</code>,
-  <code>flex-direction: column</code>, <code>align-items: stretch</code>): brand + log toggle in
-  the first row (<code>.app-header-row</code>, <code>space-between</code>), the log panel as the
-  second row. Spacing between rows comes from the column's <code>gap</code>, not from
-  the panel's <code>margin-top</code> — the panel sits close beneath the toggle when
-  opened and contributes no height when hidden. The Transcripts view keeps
-  its own slim <code>.header</code> (title + subtitle only) beneath it.</li>
+  <code>flex-direction: column</code>, <code>align-items: stretch</code>): brand + the
+  <code>.app-header-actions</code> group (theme select, log toggle) in the first row
+  (<code>.app-header-row</code>, <code>space-between</code>), the log panel as the second row.
+  Spacing between rows comes from the column's <code>gap</code>, not from the panel's
+  <code>margin-top</code> — the panel sits close beneath the toggle when opened and
+  contributes no height when hidden. The Transcripts view keeps its own
+  slim <code>.header</code> (title + subtitle only) beneath it.</li>
+<li><strong>The header row wraps rather than overflows.</strong> <code>.app-header-row</code> carries
+  <code>flex-wrap: wrap</code>: at a 420px viewport the actions group may drop to a
+  second line, but no element ever extends past the viewport (the
+  narrow-viewport overflow sweep relies on this).</li>
+<li><strong>Three-state palette, duplicated dark block.</strong> The light tokens live on
+  <code>:root</code> with <code>color-scheme: light</code>; the dark token set appears twice —
+  under <code>:root[data-theme="dark"]</code> (an explicit Dark choice set by
+  <code>app.js</code>) and under <code>:root:not([data-theme="light"])</code> inside
+  <code>@media (prefers-color-scheme: dark)</code> (the system case). In system mode
+  the attribute is absent, so the media query decides and OS preference
+  changes re-resolve with no JavaScript. The duplication is the price of
+  the no-build constraint: there is no preprocessing step to generate one
+  dark block from the other, so it must be kept in sync by hand — and the
+  docs site carries its own copy in <code>docs/style.css</code>.</li>
 <li><strong>Every long region scrolls internally with a bounded height:</strong> the
   transcript panel <code>max-height: 60vh</code>, the summary text and saved list
   <code>40vh</code>, the log panel <code>40vh</code>, the injection spliced-text preview <code>30vh</code> —
@@ -146,6 +170,12 @@ iframe that fills the remaining pane height).</p>
   log viewer in the app header), and <strong>D6</strong> (the <code>@media (max-width: 800px)</code>
   collapse of the nav into a horizontal tab row, mirroring the docs' own
   narrow-layout breakpoint and keeping the 420px overflow contract green).</li>
+<li><code>add-theme-setting</code> <strong>D3</strong> (the three-state palette: light tokens on
+  <code>:root</code>, the duplicated dark block, <code>--accent-tint</code> replacing the five
+  hard-coded accent-tint literals, <code>color-scheme</code> per palette) and <strong>D6</strong>
+  (the <code>.theme-picker</code> select reusing the <code>.provider-picker</code> treatment, and
+  <code>flex-wrap: wrap</code> on <code>.app-header-row</code> as the narrow-viewport safety
+  valve).</li>
 </ul>
 <h2>Cross-links</h2>
 <ul>

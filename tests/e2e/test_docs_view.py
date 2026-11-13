@@ -1,5 +1,5 @@
 """E2E tests for the Docs view and application view navigation
-(T-WEB-INTERFACE-019 .. 026).
+(T-WEB-INTERFACE-019 .. 026, 032).
 
 A real uvicorn instance of the app runs in-process (thread) with the upstream
 fetch chain stubbed for determinism — no real YouTube traffic. The running
@@ -11,9 +11,13 @@ Run:  python -m pytest tests/e2e/ -q
 """
 
 import asyncio
+import json
+import os
 import socket
+import tempfile
 import threading
 import time
+from pathlib import Path
 
 import pytest
 from playwright.sync_api import sync_playwright
@@ -406,3 +410,85 @@ def test_docs_not_inserted_into_app_dom(page, server):
     assert page.locator("nav.sidebar").count() == 0
     assert page.locator("#view-docs h1").count() == 0
     assert page.title() == "inj-testing"
+
+
+# --- T-WEB-INTERFACE-032: Docs view follows the application theme --------------
+# Computed body backgrounds pin the docs palette values from docs/style.css:
+# the light --bg (#f6f7f9) and the dark --bg (#10141b).
+
+DOCS_DARK_BG = "rgb(16, 20, 27)"
+
+
+@pytest.fixture()
+def fresh_transcript_dir():
+    """A fresh per-test transcript directory wired to the running server via
+    TRANSCRIPT_DIR (the app reads the variable at call time)."""
+    tmp = tempfile.TemporaryDirectory()
+    os.environ["TRANSCRIPT_DIR"] = tmp.name
+    yield Path(tmp.name)
+    os.environ.pop("TRANSCRIPT_DIR", None)
+    tmp.cleanup()
+
+
+def _docs_frame_theme_attr(page):
+    """The data-theme attribute on the Docs iframe's document root."""
+    return page.evaluate(
+        "() => document.getElementById('docs-frame').contentDocument"
+        ".documentElement.getAttribute('data-theme')"
+    )
+
+
+def _docs_frame_bg(page):
+    """The computed body background inside the Docs iframe."""
+    return page.evaluate(
+        "() => getComputedStyle("
+        "document.getElementById('docs-frame').contentDocument.body"
+        ").backgroundColor"
+    )
+
+
+def test_docs_view_follows_app_theme(browser, server, fresh_transcript_dir):
+    """T-WEB-INTERFACE-032"""
+    base = server["localhost_base"]
+
+    # An explicit Dark choice renders the docs iframe dark: the app mirrors
+    # data-theme onto the iframe's root (and re-applies it on its load).
+    (fresh_transcript_dir / "settings.json").write_text(
+        json.dumps({"theme": "dark"}), encoding="utf-8"
+    )
+    context = browser.new_context(viewport={"width": 1024, "height": 640})
+    page = context.new_page()
+    page.goto(base + "/")
+    try:
+        page.click("#nav-docs")
+        page.frame_locator("#docs-frame").locator("nav.sidebar").wait_for(
+            state="visible", timeout=10_000
+        )
+        page.wait_for_function(
+            "() => document.getElementById('docs-frame').contentDocument"
+            ".documentElement.getAttribute('data-theme') === 'dark'",
+            timeout=10_000,
+        )
+        assert _docs_frame_theme_attr(page) == "dark"
+        assert _docs_frame_bg(page) == DOCS_DARK_BG
+    finally:
+        context.close()
+
+    # With no stored theme (System), the docs follow the OS preference: a
+    # dark-OS context renders them dark, with no attribute set on the
+    # iframe's root.
+    (fresh_transcript_dir / "settings.json").unlink()
+    context = browser.new_context(
+        viewport={"width": 1024, "height": 640}, color_scheme="dark"
+    )
+    page = context.new_page()
+    page.goto(base + "/")
+    try:
+        page.click("#nav-docs")
+        page.frame_locator("#docs-frame").locator("nav.sidebar").wait_for(
+            state="visible", timeout=10_000
+        )
+        assert _docs_frame_theme_attr(page) is None
+        assert _docs_frame_bg(page) == DOCS_DARK_BG
+    finally:
+        context.close()

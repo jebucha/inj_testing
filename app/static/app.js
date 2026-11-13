@@ -21,6 +21,8 @@
   var providerPicker = document.getElementById("provider-picker");
   var autoCheckbox = document.getElementById("auto-summarize");
   var autoNote = document.getElementById("auto-summarize-note");
+  var themePicker = document.getElementById("theme-picker");
+  var docsFrame = document.getElementById("docs-frame");
   var summarizeBtn = document.getElementById("summarize-btn");
   var summarizeSpinner = document.getElementById("summarize-spinner");
   var summaryPanel = document.getElementById("summary-panel");
@@ -103,6 +105,10 @@
   // The autoSummarize setting as last known to be persisted server-side:
   // the revert target when a POST /api/settings write fails (design D6).
   var persistedAutoSummarize = false;
+  // The theme setting as last known to be persisted server-side (same
+  // revert-target role; "system" is the read default when nothing readable
+  // exists).
+  var persistedTheme = "system";
   // Model-management section state (add-summarization-model-management
   // D7/D8): the provider whose manage panel is open ("" = none) and the
   // last discovered id list per provider — advisory only, it drives the Add
@@ -784,10 +790,19 @@
       if (!res.ok) return; // keep the off-default
       var data = await res.json();
       persistedAutoSummarize = data && data.autoSummarize === true;
+      persistedTheme =
+        data && typeof data.theme === "string" &&
+        (data.theme === "system" || data.theme === "light" ||
+         data.theme === "dark")
+          ? data.theme
+          : "system";
     } catch (_) {
       persistedAutoSummarize = false;
+      persistedTheme = "system";
     }
     updateAutoCheckbox();
+    themePicker.value = persistedTheme;
+    applyTheme(persistedTheme);
   }
 
   autoCheckbox.addEventListener("change", async function () {
@@ -805,6 +820,71 @@
       }
     } catch (_) {
       autoCheckbox.checked = persistedAutoSummarize; // network failure: revert
+    }
+  });
+
+  // --- theme setting -----------------------------------------------------------
+  // The header select mirrors the server-persisted theme (loaded in
+  // loadSettings: one read, no polling). An explicit Light/Dark choice sets
+  // data-theme on the document root (and on the same-origin Docs iframe's
+  // root); System removes the attribute, so the stylesheet's
+  // prefers-color-scheme media query decides — OS preference changes then
+  // update the page with no listener here (design D4). Choosing a theme
+  // applies it immediately and posts only {"theme": ...}; on a failed write
+  // both the select and the applied palette revert to the last value the
+  // server confirmed (the auto-summarize checkbox's revert rule).
+
+  function applyTheme(theme) {
+    var root = document.documentElement;
+    if (theme === "light" || theme === "dark") {
+      root.dataset.theme = theme;
+    } else {
+      root.removeAttribute("data-theme");
+    }
+    applyThemeToDocsFrame(theme);
+  }
+
+  function applyThemeToDocsFrame(theme) {
+    var doc = null;
+    try {
+      doc = docsFrame.contentDocument;
+    } catch (_) {
+      doc = null;
+    }
+    if (!doc) return; // still loading: its load event applies the current value
+    var root = doc.documentElement;
+    if (theme === "light" || theme === "dark") {
+      root.setAttribute("data-theme", theme);
+    } else {
+      root.removeAttribute("data-theme");
+    }
+  }
+
+  // In-docs navigation (and the initial load) replaces the iframe's document,
+  // which would revert the attribute: re-apply the current value on every
+  // load event so the Docs view never drops out of step.
+  docsFrame.addEventListener("load", function () {
+    applyThemeToDocsFrame(persistedTheme);
+  });
+
+  themePicker.addEventListener("change", async function () {
+    var next = themePicker.value;
+    applyTheme(next); // the choice applies immediately, before the write
+    try {
+      var res = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ theme: next })
+      });
+      if (res.ok) {
+        persistedTheme = next; // server confirms the write
+      } else {
+        themePicker.value = persistedTheme; // revert the control
+        applyTheme(persistedTheme); // and the applied palette
+      }
+    } catch (_) {
+      themePicker.value = persistedTheme; // network failure: revert
+      applyTheme(persistedTheme);
     }
   });
 

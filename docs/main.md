@@ -102,8 +102,13 @@ to its `status`/`code`/`message` JSON envelope. Additionally returns
 `413 BODY_TOO_LARGE` (body-size middleware), `400 INVALID_NAME`,
 `400 INVALID_BODY` / `500 WRITE_FAILED` (`POST /api/settings`), and
 `404 NOT_FOUND` (plain HTTP, not taxonomy entries). The settings body is
-validated before any filesystem access: a non-object body or a
-missing/non-boolean `autoSummarize` is rejected without touching the disk.
+validated before any filesystem access: a non-object body, a body carrying
+no recognized field at all, or a recognized field holding an invalid value
+(a non-boolean `autoSummarize`, a `theme` outside `system`/`light`/`dark`)
+is rejected without touching the disk; unknown keys are ignored, never
+persisted. The write accepts a partial body — any subset of the recognized
+fields is merged into the stored settings — and echoes the full persisted
+settings (both fields, unset at their defaults).
 `POST /api/llm-call` adds `400 INVALID_PRESET` (unknown preset id,
 checked before any provider read or backend call).
 `GET /api/benchmarks` adds `400 INVALID_DIFFICULTY` (unknown/missing

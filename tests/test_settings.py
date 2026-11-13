@@ -1,4 +1,4 @@
-"""T-APP-SETTINGS-001 .. 009 (+ module-level tests for app/settings.py).
+"""T-APP-SETTINGS-001 .. 014 (+ module-level tests for app/settings.py).
 
 Settings persistence (app/settings.py) tested directly against tmp_path, and
 the /api/settings endpoints (app/main.py) through TestClient. The transcript
@@ -46,6 +46,38 @@ def test_module_load_stored_flag(tmp_path, monkeypatch):
     settings_path().write_text(json.dumps({"autoSummarize": False}),
                                encoding="utf-8")
     assert load_settings().auto_summarize is False
+
+
+def test_module_theme_read_default_and_stored(tmp_path, monkeypatch):
+    """A missing key, a non-string value, and an unrecognized value all read
+    as "system" without a log; a stored valid value is returned verbatim."""
+    monkeypatch.setenv("TRANSCRIPT_DIR", str(tmp_path))
+    buf = io.StringIO()
+    applog.setup_logging(stream=buf)
+
+    # missing key
+    settings_path().write_text(json.dumps({"autoSummarize": True}),
+                               encoding="utf-8")
+    assert load_settings().theme == "system"
+    # non-string value
+    settings_path().write_text(json.dumps({"theme": 1}), encoding="utf-8")
+    assert load_settings().theme == "system"
+    # unrecognized value
+    settings_path().write_text(json.dumps({"theme": "sepia"}),
+                               encoding="utf-8")
+    assert load_settings().theme == "system"
+    # none of these logged anything (the file parsed fine)
+    entries = [json.loads(ln) for ln in buf.getvalue().splitlines() if ln.strip()]
+    assert not [e for e in entries if e.get("event") == "settings_load_failed"]
+    # a missing file reads the default too (no file created)
+    settings_path().unlink()
+    assert load_settings().theme == "system"
+
+    # stored valid values are returned verbatim
+    for value in ("system", "light", "dark"):
+        settings_path().write_text(json.dumps({"theme": value}),
+                                   encoding="utf-8")
+        assert load_settings().theme == value
 
 
 def test_module_load_unusable_defaults_off(tmp_path, monkeypatch):
@@ -112,6 +144,35 @@ def test_module_save_atomic_roundtrip(tmp_path, monkeypatch):
     assert load_settings().auto_summarize is False
 
 
+def test_module_save_partial_merge(tmp_path, monkeypatch):
+    """A partial write merges over the stored fields: a theme-only call
+    leaves a stored autoSummarize untouched, and an autoSummarize-only call
+    leaves a stored theme untouched."""
+    monkeypatch.setenv("TRANSCRIPT_DIR", str(tmp_path))
+
+    # no file: save_settings(True) still writes exactly {"autoSummarize": true}
+    assert save_settings(True) is True
+    assert json.loads(settings_path().read_text(encoding="utf-8")) == {
+        "autoSummarize": True
+    }
+
+    # theme-only call: the stored flag survives the merge
+    assert save_settings(theme="dark") is True
+    assert json.loads(settings_path().read_text(encoding="utf-8")) == {
+        "autoSummarize": True,
+        "theme": "dark",
+    }
+
+    # autoSummarize-only call: the stored theme survives the merge
+    assert save_settings(False) is True
+    assert json.loads(settings_path().read_text(encoding="utf-8")) == {
+        "autoSummarize": False,
+        "theme": "dark",
+    }
+    assert load_settings().auto_summarize is False
+    assert load_settings().theme == "dark"
+
+
 def test_module_save_failure_returns_false(tmp_path, monkeypatch):
     """An unwritable target (missing directory) returns False without
     raising and logs settings_save_failed once."""
@@ -158,7 +219,7 @@ def test_settings_read_returns_stored_flag(api):
     response = api["client"].get("/api/settings")
 
     assert response.status_code == 200
-    assert response.json() == {"autoSummarize": True}
+    assert response.json() == {"autoSummarize": True, "theme": "system"}
 
 
 def test_settings_read_missing_file_defaults_off(api):
@@ -166,7 +227,7 @@ def test_settings_read_missing_file_defaults_off(api):
     response = api["client"].get("/api/settings")
 
     assert response.status_code == 200
-    assert response.json() == {"autoSummarize": False}
+    assert response.json() == {"autoSummarize": False, "theme": "system"}
     # the read never creates the file
     assert not _settings_file(api).exists()
 
@@ -182,7 +243,7 @@ def test_settings_read_unusable_file_defaults_off(api):
     response = api["client"].get("/api/settings")  # no crash
 
     assert response.status_code == 200
-    assert response.json() == {"autoSummarize": False}
+    assert response.json() == {"autoSummarize": False, "theme": "system"}
     # the failure is visible in the log...
     entries = [json.loads(ln) for ln in buf.getvalue().splitlines() if ln.strip()]
     assert [e for e in entries if e.get("event") == "settings_load_failed"]
@@ -194,7 +255,7 @@ def test_settings_read_unusable_file_defaults_off(api):
                                    encoding="utf-8")
     response = api["client"].get("/api/settings")
     assert response.status_code == 200
-    assert response.json() == {"autoSummarize": False}
+    assert response.json() == {"autoSummarize": False, "theme": "system"}
 
 
 def test_settings_edit_takes_effect_without_restart(api):
@@ -207,6 +268,36 @@ def test_settings_edit_takes_effect_without_restart(api):
     assert api["client"].get("/api/settings").json()["autoSummarize"] is True
 
 
+def test_settings_read_returns_stored_theme(api):
+    """T-APP-SETTINGS-010"""
+    _settings_file(api).write_text(json.dumps({"theme": "dark"}),
+                                   encoding="utf-8")
+
+    response = api["client"].get("/api/settings")
+
+    assert response.status_code == 200
+    assert response.json() == {"autoSummarize": False, "theme": "dark"}
+
+
+def test_settings_read_missing_theme_defaults_system(api):
+    """T-APP-SETTINGS-011"""
+    cases = (
+        # no theme key
+        json.dumps({"autoSummarize": True}),
+        # non-string value
+        json.dumps({"autoSummarize": True, "theme": 1}),
+        # unrecognized value
+        json.dumps({"autoSummarize": True, "theme": "sepia"}),
+    )
+    for content in cases:
+        _settings_file(api).write_text(content, encoding="utf-8")
+
+        response = api["client"].get("/api/settings")
+
+        assert response.status_code == 200
+        assert response.json() == {"autoSummarize": True, "theme": "system"}
+
+
 # --- T-APP-SETTINGS-005 .. 007: POST /api/settings ----------------------------
 
 
@@ -216,11 +307,13 @@ def test_settings_write_persists_and_echoes(api):
                                   json={"autoSummarize": True})
 
     assert response.status_code == 200
-    assert response.json() == {"autoSummarize": True}
+    assert response.json() == {"autoSummarize": True, "theme": "system"}
     assert json.loads(_settings_file(api).read_text(encoding="utf-8")) == {
         "autoSummarize": True
     }
-    assert api["client"].get("/api/settings").json() == {"autoSummarize": True}
+    assert api["client"].get("/api/settings").json() == {
+        "autoSummarize": True, "theme": "system"
+    }
 
 
 def test_settings_write_invalid_body_rejected(api):
@@ -230,7 +323,8 @@ def test_settings_write_invalid_body_rejected(api):
 
     for bad_body in ([1, 2], "true", 42, None, {},
                      {"autoSummarize": "true"}, {"autoSummarize": 1},
-                     {"other": True}):
+                     {"other": True},
+                     {"theme": "sepia"}, {"theme": 1}, {"theme": "DARK"}):
         response = api["client"].post("/api/settings", json=bad_body)
         assert response.status_code == 400
         assert response.json()["error"]["code"] == "INVALID_BODY"
@@ -254,6 +348,57 @@ def test_settings_write_invalid_body_rejected(api):
     assert not _settings_file(api).exists()
 
 
+def test_settings_write_merges_partial_body(api):
+    """T-APP-SETTINGS-014"""
+    _settings_file(api).write_text(
+        json.dumps({"autoSummarize": True, "theme": "dark"}),
+        encoding="utf-8")
+
+    response = api["client"].post("/api/settings", json={"theme": "light"})
+
+    assert response.status_code == 200
+    assert response.json() == {"autoSummarize": True, "theme": "light"}
+    assert json.loads(_settings_file(api).read_text(encoding="utf-8")) == {
+        "autoSummarize": True,
+        "theme": "light",
+    }
+    assert api["client"].get("/api/settings").json() == {
+        "autoSummarize": True, "theme": "light"
+    }
+
+
+def test_settings_theme_invalid_value_rejected(api):
+    """T-APP-SETTINGS-012"""
+    _settings_file(api).write_text(json.dumps({"autoSummarize": True}),
+                                   encoding="utf-8")
+
+    for bad_theme in ("sepia", "DARK", "", 1, None, ["dark"]):
+        response = api["client"].post("/api/settings",
+                                      json={"theme": bad_theme})
+        assert response.status_code == 400
+        assert response.json()["error"]["code"] == "INVALID_BODY"
+
+    # the settings file is unchanged by every rejection
+    assert json.loads(_settings_file(api).read_text(encoding="utf-8")) == {
+        "autoSummarize": True
+    }
+
+
+def test_settings_unknown_keys_ignored(api):
+    """T-APP-SETTINGS-013"""
+    response = api["client"].post("/api/settings",
+                                  json={"theme": "dark", "unexpected": 1})
+
+    assert response.status_code == 200
+    assert response.json() == {"autoSummarize": False, "theme": "dark"}
+    stored = json.loads(_settings_file(api).read_text(encoding="utf-8"))
+    assert stored == {"theme": "dark"}
+    assert "unexpected" not in stored
+    assert api["client"].get("/api/settings").json() == {
+        "autoSummarize": False, "theme": "dark"
+    }
+
+
 def test_settings_write_unwritable_directory_fails(api, monkeypatch):
     """T-APP-SETTINGS-007"""
     assert api["client"].post("/api/settings",
@@ -274,7 +419,9 @@ def test_settings_write_unwritable_directory_fails(api, monkeypatch):
 
     # ...and the previously stored value is still readable
     monkeypatch.setenv("TRANSCRIPT_DIR", str(api["transcript_dir"]))
-    assert api["client"].get("/api/settings").json() == {"autoSummarize": True}
+    assert api["client"].get("/api/settings").json() == {
+        "autoSummarize": True, "theme": "system"
+    }
 
 
 # --- T-APP-SETTINGS-008 .. 009: isolation and independence --------------------
@@ -326,11 +473,11 @@ def test_settings_during_in_flight_fetch_succeeds(api, monkeypatch):
         assert fetch_started.wait(timeout=10)  # the fetch is in flight
         response = api["client"].get("/api/settings")
         assert response.status_code == 200
-        assert response.json() == {"autoSummarize": False}
+        assert response.json() == {"autoSummarize": False, "theme": "system"}
         response = api["client"].post("/api/settings",
                                       json={"autoSummarize": True})
         assert response.status_code == 200
-        assert response.json() == {"autoSummarize": True}
+        assert response.json() == {"autoSummarize": True, "theme": "system"}
         # the settings requests did not invoke the fetch chain
         assert fetch_calls == ["dQw4w9WgXcQ"]
     finally:

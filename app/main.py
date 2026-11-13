@@ -48,7 +48,7 @@ from app.provider_overrides import (
     remove_model,
 )
 from app.providers import load_providers
-from app.settings import load_settings, save_settings
+from app.settings import THEME_VALUES, load_settings, save_settings
 
 STATIC_DIR = Path(__file__).parent / "static"
 DOCS_DIR = Path(__file__).resolve().parent.parent / "docs"
@@ -394,15 +394,18 @@ def create_app() -> FastAPI:
         # touches the fetch chain or the single-flight semaphore, and blocking
         # I/O runs off the event loop.
         settings = await asyncio.to_thread(load_settings)
-        return {"autoSummarize": settings.auto_summarize}
+        return {"autoSummarize": settings.auto_summarize,
+                "theme": settings.theme}
 
     @app.post("/api/settings")
     async def settings_write_endpoint(request: Request):
         # Validate the body before any filesystem access (design D3): a
-        # non-object body or a missing/non-boolean autoSummarize is a 400
-        # INVALID_BODY with no write. A write failure is a 500 WRITE_FAILED
-        # (save_settings already logged settings_save_failed). Never touches
-        # the fetch chain or the single-flight semaphore.
+        # non-object body, a body with no recognized field, or a recognized
+        # field holding an invalid value is a 400 INVALID_BODY with no
+        # write. Unknown keys are ignored, never persisted. A write failure
+        # is a 500 WRITE_FAILED (save_settings already logged
+        # settings_save_failed). Never touches the fetch chain or the
+        # single-flight semaphore.
         try:
             body = await request.json()
         except Exception:
@@ -411,18 +414,39 @@ def create_app() -> FastAPI:
             return JSONResponse(
                 status_code=400,
                 content={"error": {"code": "INVALID_BODY",
-                                   "message": "Expected a JSON object with a "
-                                              "boolean autoSummarize field."}},
+                                   "message": "Expected a JSON object with "
+                                              "one or more of the recognized "
+                                              "setting fields."}},
             )
-        auto_summarize = body.get("autoSummarize")
-        if not isinstance(auto_summarize, bool):
+        updates: dict = {}
+        if "autoSummarize" in body:
+            if not isinstance(body["autoSummarize"], bool):
+                return JSONResponse(
+                    status_code=400,
+                    content={"error": {"code": "INVALID_BODY",
+                                       "message": "autoSummarize must be a "
+                                                  "boolean."}},
+                )
+            updates["auto_summarize"] = body["autoSummarize"]
+        if "theme" in body:
+            if (not isinstance(body["theme"], str)
+                    or body["theme"] not in THEME_VALUES):
+                return JSONResponse(
+                    status_code=400,
+                    content={"error": {"code": "INVALID_BODY",
+                                       "message": "theme must be one of: "
+                                                  "system, light, dark."}},
+                )
+            updates["theme"] = body["theme"]
+        if not updates:
             return JSONResponse(
                 status_code=400,
                 content={"error": {"code": "INVALID_BODY",
-                                   "message": "autoSummarize must be a "
-                                              "boolean."}},
+                                   "message": "Expected a JSON object with "
+                                              "one or more of the recognized "
+                                              "setting fields."}},
             )
-        saved = await asyncio.to_thread(save_settings, auto_summarize)
+        saved = await asyncio.to_thread(save_settings, **updates)
         if not saved:
             return JSONResponse(
                 status_code=500,
@@ -430,7 +454,11 @@ def create_app() -> FastAPI:
                                    "message": "Could not save the settings "
                                               "file."}},
             )
-        return {"autoSummarize": auto_summarize}
+        # Echo the full persisted settings (both fields, unset at their
+        # defaults) straight back from the file the write just produced.
+        settings = await asyncio.to_thread(load_settings)
+        return {"autoSummarize": settings.auto_summarize,
+                "theme": settings.theme}
 
     @app.get("/api/transcripts/{name}")
     async def read_transcript_endpoint(name: str):

@@ -5,8 +5,9 @@
 The entire web UI's markup: one page, no framework, no build step, no CDN.
 It defines the DOM contract that `app.js` consumes — every id the script
 reaches for — and the visible structure. The page is an application frame:
-an app header (the `inj-testing` brand, the "Show logs" toggle, and the log
-viewer), a left-pane navigation with two items ("Transcripts" and "Docs"),
+an app header (the `inj-testing` brand, the theme select, the "Show logs"
+toggle, and the log viewer), a left-pane navigation with two items
+("Transcripts" and "Docs"),
 and a main pane holding two view sections. The Transcripts view
 (`#view-transcripts`) contains the entire original interface — the "YouTube
 Transcript" title and subtitle, the fetch form, the error banner, the result
@@ -51,7 +52,10 @@ The effective API is the id/class contract with `app.js`:
   class), `app-main`, `view-transcripts` (the Transcripts view section,
   default visible), `view-docs` (the Docs view section, `hidden` by
   default), `docs-toolbar`, `docs-open-new` (the open-in-new-window link),
-  and `docs-frame` (the iframe whose `src` is `/docs/`).
+  `docs-frame` (the iframe whose `src` is `/docs/`), and the header controls:
+  `app-header-actions` (the right-aligned control group) and `theme-picker`
+  (the three-option theme select — `system`/`light`/`dark`, labeled
+  System/Light/Dark, defaulting to `system`).
 
 ## Invariants
 
@@ -64,8 +68,11 @@ The effective API is the id/class contract with `app.js`:
 - **The log panel is app-level, in the app header's second row** — not
   inside either view and not at the bottom of the page flow — so opening it
   never requires scrolling and it stays available in both views. The header
-  is a column of rows (brand + toggle on the first row, panel on the
-  second), with row gap providing the spacing.
+  is a column of rows (brand + the actions group — theme select, toggle —
+  on the first row, panel on the second), with row gap providing the
+  spacing. The first row is allowed to wrap at narrow viewports
+  (`flex-wrap` in the stylesheet), but it must never overflow horizontally
+  at 420px.
 - **The frame is header → body row of left nav + main pane.** The view
   sections live inside `app-main`; the Transcripts view is the default
   (visible) view and holds the whole original interface unchanged, including
@@ -143,6 +150,10 @@ Resolved from the archived change design docs:
   view-specific title/subtitle move into the Transcripts view), and **D5**
   (the Transcripts content moves in unchanged; view switching is a
   `hidden` toggle with the `aria-current`/`active` marker, no persistence).
+- `add-theme-setting` **D6** — the three-option `theme-picker` select
+  (System/Light/Dark, defaulting to `system`) in the header's actions group
+  beside the log toggle, with the row wrapping (never overflowing) at
+  narrow viewports.
 
 ## Cross-links
 

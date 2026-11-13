@@ -40,17 +40,20 @@
 <h2>Purpose</h2>
 <p>Reads and writes the durable application-level UI preference file
 (<code>settings.json</code> in the transcript directory) — the setting is read on
-<strong>every call</strong>, never at startup. Today the file holds one boolean,
-<code>autoSummarize</code>; the shape may grow fields later, nothing is designed ahead
-of need.</p>
+<strong>every call</strong>, never at startup. The file holds the <code>autoSummarize</code> boolean
+and the <code>theme</code> setting (<code>system</code> / <code>light</code> / <code>dark</code>).</p>
 <h2>Public surface</h2>
 <ul>
 <li><code>load_settings() -&gt; Settings</code> — one settings read.</li>
-<li><code>save_settings(auto_summarize: bool) -&gt; bool</code> — atomic write; returns
-  whether it succeeded (never raises).</li>
+<li><code>save_settings(auto_summarize=None, theme=None) -&gt; bool</code> — atomic
+  partial-merge write: <code>None</code> means "leave as stored"; returns whether it
+  succeeded (never raises).</li>
 <li><code>settings_path() -&gt; Path</code> — resolves <code>settings.json</code> under
   <code>persist.transcript_dir()</code> at call time.</li>
-<li><code>Settings</code> — frozen dataclass: <code>auto_summarize</code> (bool).</li>
+<li><code>Settings</code> — frozen dataclass: <code>auto_summarize</code> (bool), <code>theme</code> (str,
+  read default <code>"system"</code>).</li>
+<li><code>THEME_VALUES</code> — the exact theme set <code>{"system", "light", "dark"}</code>;
+  <code>_DEFAULT_THEME</code> — <code>"system"</code>.</li>
 </ul>
 <h2>Invariants</h2>
 <ul>
@@ -63,7 +66,19 @@ of need.</p>
 <li><strong>Safe off-default, never an exception.</strong> A missing file (the normal
   state — no log), an unreadable file, malformed JSON, a non-object top
   level, or a missing/non-boolean <code>autoSummarize</code> all return
-  <code>auto_summarize=False</code> without raising.</li>
+  <code>auto_summarize=False</code> without raising; a missing, non-string, or
+  unrecognized <code>theme</code> value likewise reads as <code>"system"</code>, again without a
+  log (the file itself parsed fine).</li>
+<li><strong>The file stores only what was written; defaults apply on read.</strong> A
+  field that was never persisted is absent from the file and reads as its
+  default. <code>save_settings</code> reads the stored fields first, overlays only the
+  provided ones, and writes the merged object — so a theme-only call leaves
+  a stored <code>autoSummarize</code> untouched, and a first <code>save_settings(True)</code> still
+  writes exactly <code>{"autoSummarize": true}</code>.</li>
+<li><strong>Unrecognized keys are never persisted.</strong> The merge base is built from
+  the two recognized fields only; any other key in the file is dropped from
+  the merged write (a stored value the read side would treat as its default,
+  e.g. an unrecognized theme, is dropped too, so it never survives a merge).</li>
 <li><strong>Malformed files are diagnosable but never echoed.</strong> An unreadable or
   malformed file logs exactly one <code>settings_load_failed</code> error event
   carrying the path and the parse/OS error detail — never the file's

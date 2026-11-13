@@ -3,17 +3,23 @@
 ## Purpose
 
 The single self-contained stylesheet for the UI: the design tokens
-(custom properties on `:root`), the application-frame layout (app header,
-left-pane navigation, view panes, and the narrow-viewport collapse), and the
-class styles for every region `app.js` drives. No web fonts, no CDN, no
-external references of any kind — the app's no-CDN constraint applies to CSS
-as firmly as to JS.
+(custom properties on `:root`, in light and dark palettes), the
+application-frame layout (app header, left-pane navigation, view panes, and
+the narrow-viewport collapse), and the class styles for every region `app.js`
+drives. No web fonts, no CDN, no external references of any kind — the app's
+no-CDN constraint applies to CSS as firmly as to JS.
 
 ## Public surface
 
 Design tokens: `--bg`, `--panel`, `--text`, `--muted`, `--accent`,
-`--accent-dark`, `--error-*`, `--border`. Class/element contract with
-`index.html` / `app.js`: `.container` (the single 760px column),
+`--accent-dark`, `--error-*`, `--border`, and `--accent-tint` (the
+translucent accent used for hover/active fills). Each palette also sets
+`color-scheme` so the native form controls and scrollbars the browser
+renders match it. The light tokens live on `:root`; the identical dark token
+set is duplicated in `:root[data-theme="dark"]` (an explicit Dark choice)
+and inside `@media (prefers-color-scheme: dark)` over
+`:root:not([data-theme="light"])` (the system case). Class/element contract
+with `index.html` / `app.js`: `.container` (the single 760px column),
 `.header` / `.header-row`, `.row`, `.url-input`, `.btn` / `.btn-quiet`,
 `.spinner`, `.error-banner`, `.result-*`, `.video-title`,
 `.video-language`, `.transcript-panel`, `.provider-picker`,
@@ -30,8 +36,11 @@ spliced-text preview), `.benchmark-tally` (the per-model results table),
 `.benchmark-rows` / `.bench-row` / `.bench-row-title` / `.bench-output` /
 `.bench-meta` / `.bench-human-label` / `.bench-human` (the per-model result
 rows), `.log-panel`, and the application frame: `.app-header` /
-`.app-header-row` / `.app-brand` (the brand + log-toggle row over the log
-panel), `.app-body` (the nav + main-pane row), `.app-nav` / `.nav-item` (the
+`.app-header-row` / `.app-brand` (the brand + actions row over the log
+panel), `.app-header-actions` (the right-aligned control group: the theme
+select and the log toggle), `.theme-picker` (the theme select, same select
+treatment as `.provider-picker`), `.app-body` (the nav + main-pane row),
+`.app-nav` / `.nav-item` (the
 left navigation column; `.nav-item.active` is the active-view state),
 `.app-main` (the view-pane column), `.view` (a view section), `#view-docs` /
 `.docs-toolbar` / `#docs-frame` (the Docs view: a toolbar row over an
@@ -63,12 +72,27 @@ iframe that fills the remaining pane height).
   (`flex: 1`) centered items above the content, so a 420px viewport shows
   no horizontal overflow.
 - **The app header is a column of rows** (`.app-header`,
-  `flex-direction: column`, `align-items: stretch`): brand + log toggle in
-  the first row (`.app-header-row`, `space-between`), the log panel as the
-  second row. Spacing between rows comes from the column's `gap`, not from
-  the panel's `margin-top` — the panel sits close beneath the toggle when
-  opened and contributes no height when hidden. The Transcripts view keeps
-  its own slim `.header` (title + subtitle only) beneath it.
+  `flex-direction: column`, `align-items: stretch`): brand + the
+  `.app-header-actions` group (theme select, log toggle) in the first row
+  (`.app-header-row`, `space-between`), the log panel as the second row.
+  Spacing between rows comes from the column's `gap`, not from the panel's
+  `margin-top` — the panel sits close beneath the toggle when opened and
+  contributes no height when hidden. The Transcripts view keeps its own
+  slim `.header` (title + subtitle only) beneath it.
+- **The header row wraps rather than overflows.** `.app-header-row` carries
+  `flex-wrap: wrap`: at a 420px viewport the actions group may drop to a
+  second line, but no element ever extends past the viewport (the
+  narrow-viewport overflow sweep relies on this).
+- **Three-state palette, duplicated dark block.** The light tokens live on
+  `:root` with `color-scheme: light`; the dark token set appears twice —
+  under `:root[data-theme="dark"]` (an explicit Dark choice set by
+  `app.js`) and under `:root:not([data-theme="light"])` inside
+  `@media (prefers-color-scheme: dark)` (the system case). In system mode
+  the attribute is absent, so the media query decides and OS preference
+  changes re-resolve with no JavaScript. The duplication is the price of
+  the no-build constraint: there is no preprocessing step to generate one
+  dark block from the other, so it must be kept in sync by hand — and the
+  docs site carries its own copy in `docs/style.css`.
 - **Every long region scrolls internally with a bounded height:** the
   transcript panel `max-height: 60vh`, the summary text and saved list
   `40vh`, the log panel `40vh`, the injection spliced-text preview `30vh` —
@@ -118,6 +142,12 @@ Resolved from the archived change design docs:
   log viewer in the app header), and **D6** (the `@media (max-width: 800px)`
   collapse of the nav into a horizontal tab row, mirroring the docs' own
   narrow-layout breakpoint and keeping the 420px overflow contract green).
+- `add-theme-setting` **D3** (the three-state palette: light tokens on
+  `:root`, the duplicated dark block, `--accent-tint` replacing the five
+  hard-coded accent-tint literals, `color-scheme` per palette) and **D6**
+  (the `.theme-picker` select reusing the `.provider-picker` treatment, and
+  `flex-wrap: wrap` on `.app-header-row` as the narrow-viewport safety
+  valve).
 
 ## Cross-links
 

@@ -5,7 +5,8 @@
 The entire frontend behavior, in one vanilla-JS IIFE with `"use strict"`:
 view navigation (Transcripts / Docs), fetch flow and result display,
 copy/download, the saved-transcripts list, summarization, the prompt-injection
-benchmark, and the live log viewer. No framework, no build step, no CDN —
+benchmark, the live log viewer, and the theme setting (load, apply, persist,
+and Docs-iframe sync). No framework, no build step, no CDN —
 the file is served as-is at `/app.js` and references DOM ids defined in
 `index.html`.
 
@@ -23,7 +24,8 @@ ids it requires from `index.html`: `url-input`, `fetch-form`, `fetch-btn`,
 `benchmark-reroll`, `difficulty-error`, `benchmark-models`,
 `benchmark-judge`, `benchmark-run`, `benchmark-spinner`, `benchmark-label`,
 `benchmark-results`, `benchmark-tally`, `benchmark-rows`, `log-panel`,
-`logs-toggle`, and the view-navigation elements `nav-transcripts`,
+`logs-toggle`, the header theme control `theme-picker`, the Docs iframe
+`docs-frame`, and the view-navigation elements `nav-transcripts`,
 `nav-docs`, `view-transcripts`, and `view-docs`. It also defines the
 `ERROR_MESSAGES` map (server error code
 → human message) for the eleven taxonomy codes plus `NOT_FOUND`; the
@@ -45,11 +47,16 @@ line.
   fetched transcript, an in-flight summarization — survives a round trip
   through the Docs view. The selection is stored nowhere, so a reload always
   lands on the default Transcripts view.
-- **The Docs view is display-only for the script.** The documentation is
-  loaded by the iframe's `src` (a document the app script never reads or
-  writes); the script only toggles the view's visibility and the active
-  marker. The open-in-new-window link is plain markup (`target="_blank"`),
-  no script involvement.
+- **The Docs view is display-only, except for the theme attribute.** The
+  documentation is loaded by the iframe's `src`; the script never inserts
+  docs markup into either document and otherwise only toggles the view's
+  visibility and the active marker. The single write into the same-origin
+  iframe is the `data-theme` attribute on its `documentElement` (kept in
+  step with the app's explicit theme choice), re-applied on the iframe's
+  `load` event because in-docs navigation replaces the iframe's document.
+  The open-in-new-window link is plain markup (`target="_blank"`), no
+  script involvement — the standalone docs window follows the operating
+  system, not the app's choice.
 - **Requests use the real file name, display uses a prettified one.** List
   rows keep the real name in `data-name`; the display label (extension
   stripped, underscores → spaces, CSS capitalization) is cosmetic and is
@@ -87,6 +94,17 @@ line.
   change and reverts the checkbox to the last persisted value if the write
   fails. It is interactive only when providers are configured and is
   disabled while any summarize is in flight.
+- **The theme control mirrors the server setting.** Loaded in the same
+  `GET /api/settings` read (no polling); an explicit Light/Dark sets
+  `data-theme` on the document root (and on the same-origin Docs iframe's
+  root), while System **removes** the attribute so the stylesheet's
+  `prefers-color-scheme` media query decides — OS preference changes then
+  update the page with no listener. Choosing a theme applies it
+  immediately and posts only `{"theme": ...}` (never the whole settings
+  object); on a failed write both the select and the applied palette
+  revert to the last value the server confirmed, the auto-summarize
+  checkbox's revert rule. The iframe's `load` event re-applies the current
+  value, so in-docs navigation never reverts the palette.
 - **No polling.** The saved list, the provider list, and the settings load
   once on page load, the list also reloads after each successful fetch and
   via its Refresh button. The provider list is never re-fetched (a stale
@@ -252,6 +270,13 @@ Resolved from the archived change design docs:
   clicked nav item — the existing IIFE convention is preserved, the
   Transcripts content is never removed from the DOM, and no view state is
   persisted).
+- `add-theme-setting` **D4** (explicit Light/Dark set `data-theme` on the
+  document root, System removes the attribute so the media query re-resolves
+  on its own; the same attribute is mirrored onto the same-origin Docs
+  iframe and re-applied on its `load` event) and **D5/D6** (no pre-paint
+  bootstrapping script — the stored value only arrives with the settings
+  read; the control posts only `{"theme": ...}` and reverts select and
+  palette on a failed write).
 
 ## Cross-links
 

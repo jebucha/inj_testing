@@ -289,9 +289,24 @@ failures stay quiet — a subdued inline note instead of the red error
 banner — and manual Summarize stays the retry path. The toggle is
 interactive only when providers are configured. The setting persists
 server-side through `GET/POST /api/settings` (a `settings.json` file in
-the transcripts directory, shape `{"autoSummarize": true|false}`), so it
-survives reloads and container restarts; a failed write reverts the
-checkbox to the last persisted value.
+the transcripts directory), so it survives reloads and container
+restarts; a failed write reverts the checkbox to the last persisted
+value.
+
+**Theme.** The theme select in the app header chooses the page's color
+palette: `system` (the default) follows the operating system's light or
+dark preference, including changes made without a reload, while an
+explicit `light` or `dark` choice overrides it. The choice applies
+immediately and the embedded Docs view renders in the same palette (the
+docs site opened in its own window is static HTML and follows the
+operating system). Both UI settings live in the same `settings.json`
+file — shape `{"autoSummarize": true|false, "theme": "system"|"light"|"dark"}`
+— and both controls write through `POST /api/settings`, which accepts a
+**partial** body: each control posts only the field it changed, the field
+is merged into the stored settings, and the full persisted settings are
+echoed back (a body carrying no recognized field, or an invalid value,
+is a `400 INVALID_BODY`). A failed write reverts the control to the last
+persisted value.
 
 **Error messages.** `NOT_CONFIGURED` 503 — no usable providers found in the
 config file. `INVALID_PROVIDER` 400 — the picked provider or model is no

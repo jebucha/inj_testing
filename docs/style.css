@@ -1,6 +1,14 @@
-/* inj-testing code docs — self-contained; no web fonts, no CDN. */
+/* inj-testing code docs — self-contained; no web fonts, no CDN.
+
+   Three-state palette (mirroring app/static/style.css, whose dark block is
+   likewise duplicated per stylesheet): light tokens on :root; the same dark
+   set under [data-theme="dark"] (set by the app when it embeds this site)
+   and under the prefers-color-scheme media query (a standalone window with
+   no script follows the OS). color-scheme keeps native scrollbars and form
+   controls legible in each palette. */
 
 :root {
+  color-scheme: light;
   --bg: #f6f7f9;
   --panel: #ffffff;
   --text: #1c2330;
@@ -8,6 +16,30 @@
   --accent: #2f6fed;
   --border: #d7dce2;
   --code-bg: #eef1f4;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #10141b;
+  --panel: #1a202a;
+  --text: #e4e9f0;
+  --muted: #97a3b3;
+  --accent: #6396f2;
+  --border: #2f3946;
+  --code-bg: #232b36;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #10141b;
+    --panel: #1a202a;
+    --text: #e4e9f0;
+    --muted: #97a3b3;
+    --accent: #6396f2;
+    --border: #2f3946;
+    --code-bg: #232b36;
+  }
 }
 
 * { box-sizing: border-box; }

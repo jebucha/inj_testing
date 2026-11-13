@@ -4,18 +4,21 @@
 
 Reads and writes the durable application-level UI preference file
 (`settings.json` in the transcript directory) — the setting is read on
-**every call**, never at startup. Today the file holds one boolean,
-`autoSummarize`; the shape may grow fields later, nothing is designed ahead
-of need.
+**every call**, never at startup. The file holds the `autoSummarize` boolean
+and the `theme` setting (`system` / `light` / `dark`).
 
 ## Public surface
 
 - `load_settings() -> Settings` — one settings read.
-- `save_settings(auto_summarize: bool) -> bool` — atomic write; returns
-  whether it succeeded (never raises).
+- `save_settings(auto_summarize=None, theme=None) -> bool` — atomic
+  partial-merge write: `None` means "leave as stored"; returns whether it
+  succeeded (never raises).
 - `settings_path() -> Path` — resolves `settings.json` under
   `persist.transcript_dir()` at call time.
-- `Settings` — frozen dataclass: `auto_summarize` (bool).
+- `Settings` — frozen dataclass: `auto_summarize` (bool), `theme` (str,
+  read default `"system"`).
+- `THEME_VALUES` — the exact theme set `{"system", "light", "dark"}`;
+  `_DEFAULT_THEME` — `"system"`.
 
 ## Invariants
 
@@ -28,7 +31,19 @@ of need.
 - **Safe off-default, never an exception.** A missing file (the normal
   state — no log), an unreadable file, malformed JSON, a non-object top
   level, or a missing/non-boolean `autoSummarize` all return
-  `auto_summarize=False` without raising.
+  `auto_summarize=False` without raising; a missing, non-string, or
+  unrecognized `theme` value likewise reads as `"system"`, again without a
+  log (the file itself parsed fine).
+- **The file stores only what was written; defaults apply on read.** A
+  field that was never persisted is absent from the file and reads as its
+  default. `save_settings` reads the stored fields first, overlays only the
+  provided ones, and writes the merged object — so a theme-only call leaves
+  a stored `autoSummarize` untouched, and a first `save_settings(True)` still
+  writes exactly `{"autoSummarize": true}`.
+- **Unrecognized keys are never persisted.** The merge base is built from
+  the two recognized fields only; any other key in the file is dropped from
+  the merged write (a stored value the read side would treat as its default,
+  e.g. an unrecognized theme, is dropped too, so it never survives a merge).
 - **Malformed files are diagnosable but never echoed.** An unreadable or
   malformed file logs exactly one `settings_load_failed` error event
   carrying the path and the parse/OS error detail — never the file's

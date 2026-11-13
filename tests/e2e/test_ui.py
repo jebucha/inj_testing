@@ -1,4 +1,4 @@
-"""E2E UI tests (T-WEB-INTERFACE-001 .. 018).
+"""E2E UI tests (T-WEB-INTERFACE-001 .. 018, 027 .. 031).
 
 A real uvicorn instance of the app runs in-process (thread) with the upstream
 fetch chain stubbed for determinism — no real YouTube traffic.
@@ -8,6 +8,7 @@ Run:  python -m pytest tests/e2e/ -q
 """
 
 import asyncio
+import json
 import os
 import shutil
 import socket
@@ -910,3 +911,160 @@ def test_download_over_plain_http(http_page, saved_env):
         assert target.read_bytes() == content.encode("utf-8")
     finally:
         target.unlink()
+
+
+# --- T-WEB-INTERFACE-027 .. 031: theme control ---------------------------------
+# The header theme select mirrors the server-persisted theme. Computed
+# backgrounds pin the palette values from app/static/style.css: the light
+# --bg (#f6f7f9) and the dark --bg (#10141b).
+
+THEME_LIGHT_BG = "rgb(246, 247, 249)"
+THEME_DARK_BG = "rgb(16, 20, 27)"
+
+
+def _theme_body_bg(page):
+    return page.evaluate(
+        "() => getComputedStyle(document.body).backgroundColor"
+    )
+
+
+def test_theme_control_defaults_to_system(page, server, saved_env):
+    """T-WEB-INTERFACE-027"""
+    page.reload()  # fresh transcript directory: no stored theme
+
+    picker = page.locator("#theme-picker")
+    assert picker.count() == 1
+    assert [
+        picker.locator(f"option[value={value}]").inner_text()
+        for value in ("system", "light", "dark")
+    ] == ["System", "Light", "Dark"]
+    assert picker.input_value() == "system"
+    # no explicit choice: no data-theme attribute, the palette follows the OS
+    assert page.evaluate(
+        "() => document.documentElement.getAttribute('data-theme')"
+    ) is None
+    # the settings read on load never creates the file
+    assert not (saved_env / "settings.json").exists()
+
+
+def test_theme_dark_applies_and_persists(page, server, saved_env):
+    """T-WEB-INTERFACE-028"""
+    page.reload()
+
+    page.select_option("#theme-picker", "dark")
+    page.wait_for_function(
+        "() => fetch('/api/settings').then(r => r.json())"
+        ".then(d => d.theme === 'dark')",
+        timeout=10_000,
+    )
+    # the dark palette renders immediately, and the theme-only write is what
+    # the file stores
+    assert page.evaluate(
+        "() => document.documentElement.getAttribute('data-theme')"
+    ) == "dark"
+    assert _theme_body_bg(page) == THEME_DARK_BG
+    assert json.loads((saved_env / "settings.json").read_text(encoding="utf-8")) == {
+        "theme": "dark"
+    }
+
+    # the choice survives a reload: the control still shows Dark and the
+    # page still renders the dark palette
+    page.reload()
+    page.wait_for_function(
+        "() => document.documentElement.getAttribute('data-theme') === 'dark'",
+        timeout=10_000,
+    )
+    assert page.locator("#theme-picker").input_value() == "dark"
+    assert _theme_body_bg(page) == THEME_DARK_BG
+
+
+def test_theme_write_failure_reverts_control(page, server, saved_env):
+    """T-WEB-INTERFACE-029"""
+    page.reload()
+    assert not (saved_env / "settings.json").exists()
+
+    # Break the settings write path: POSTs get a 500 (recorded), GETs pass
+    # through untouched.
+    posted = []
+
+    def handler(route):
+        if route.request.method == "POST":
+            posted.append(route.request.post_data_json)
+            route.fulfill(status=500, content_type="application/json",
+                          body=json.dumps({"error": {"code": "INTERNAL"}}))
+        else:
+            route.fallback()
+
+    page.route("**/api/settings", handler)
+    page.select_option("#theme-picker", "dark")
+    # The optimistic apply fires the write with only the changed field...
+    deadline = time.monotonic() + 10
+    while not posted and time.monotonic() < deadline:
+        page.wait_for_timeout(50)
+    assert posted == [{"theme": "dark"}]
+    # ...and on the failed write both the control and the applied palette
+    # revert to the last persisted value (system: no attribute, light palette
+    # on a light-OS context).
+    page.wait_for_function(
+        "() => document.getElementById('theme-picker').value === 'system'",
+        timeout=10_000,
+    )
+    assert page.evaluate(
+        "() => document.documentElement.getAttribute('data-theme')"
+    ) is None
+    assert _theme_body_bg(page) == THEME_LIGHT_BG
+    assert not (saved_env / "settings.json").exists()
+
+
+def test_theme_system_follows_dark_os(browser, server, saved_env):
+    """T-WEB-INTERFACE-030"""
+    context = browser.new_context(
+        viewport={"width": 1024, "height": 640}, color_scheme="dark"
+    )
+    page = context.new_page()
+    page.goto(server["localhost_base"] + "/")
+    try:
+        # No stored theme: the control shows System, the page carries no
+        # data-theme attribute, and the dark OS preference renders the dark
+        # palette...
+        assert page.locator("#theme-picker").input_value() == "system"
+        assert page.evaluate(
+            "() => document.documentElement.getAttribute('data-theme')"
+        ) is None
+        assert _theme_body_bg(page) == THEME_DARK_BG
+        # ...and the dark color-scheme reaches the native controls
+        for selector in ("#auto-summarize", "#theme-picker"):
+            assert page.evaluate(
+                "sel => getComputedStyle(document.querySelector(sel))"
+                ".colorScheme",
+                selector,
+            ) == "dark", selector
+    finally:
+        context.close()
+
+
+def test_theme_explicit_light_overrides_dark_os(browser, server, saved_env):
+    """T-WEB-INTERFACE-031"""
+    # Seed an explicit Light choice before the page loads.
+    (saved_env / "settings.json").write_text(
+        json.dumps({"theme": "light"}), encoding="utf-8"
+    )
+    context = browser.new_context(
+        viewport={"width": 1024, "height": 640}, color_scheme="dark"
+    )
+    page = context.new_page()
+    page.goto(server["localhost_base"] + "/")
+    try:
+        # The explicit choice wins over the dark OS preference...
+        page.wait_for_function(
+            "() => document.documentElement.getAttribute('data-theme') === 'light'",
+            timeout=10_000,
+        )
+        assert _theme_body_bg(page) == THEME_LIGHT_BG
+        # ...and the light color-scheme reaches the native controls
+        assert page.evaluate(
+            "sel => getComputedStyle(document.querySelector(sel)).colorScheme",
+            "#theme-picker",
+        ) == "light"
+    finally:
+        context.close()

@@ -1,4 +1,11 @@
+/* Light tokens — the default palette. --accent-tint is the translucent
+   accent used for hover/active fills; it is re-tinted per palette. The dark
+   palette is duplicated in both the [data-theme="dark"] attribute selector
+   (an explicit Dark choice) and the prefers-color-scheme media query (the
+   system case) — the price of having no build step (see
+   docs/static/style-css.md). */
 :root {
+  color-scheme: light;
   --bg: #f6f7f9;
   --panel: #ffffff;
   --text: #1c2330;
@@ -9,6 +16,41 @@
   --error-border: #f2b8b8;
   --error-text: #9c2b2b;
   --border: #d7dce2;
+  --accent-tint: rgba(47, 111, 237, 0.08);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #10141b;
+  --panel: #1a202a;
+  --text: #e4e9f0;
+  --muted: #97a3b3;
+  --accent: #6396f2;
+  --accent-dark: #85acf5;
+  --error-bg: #392424;
+  --error-border: #6f4747;
+  --error-text: #f2abab;
+  --border: #2f3946;
+  --accent-tint: rgba(99, 150, 242, 0.16);
+}
+
+/* System mode (no data-theme attribute, or data-theme="system"): follow the
+   operating system's preference. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #10141b;
+    --panel: #1a202a;
+    --text: #e4e9f0;
+    --muted: #97a3b3;
+    --accent: #6396f2;
+    --accent-dark: #85acf5;
+    --error-bg: #392424;
+    --error-border: #6f4747;
+    --error-text: #f2abab;
+    --border: #2f3946;
+    --accent-tint: rgba(99, 150, 242, 0.16);
+  }
 }
 
 * { box-sizing: border-box; }
@@ -41,16 +83,38 @@ body {
   border-bottom: 1px solid var(--border);
 }
 
+/* flex-wrap is the narrow-viewport safety valve: at 420px the actions
+   group may drop to a second line instead of overflowing (T-WEB-INTERFACE-024
+   sweeps every element for horizontal overflow). */
 .app-header-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 12px;
 }
 
 .app-brand {
   font-size: 1.15rem;
   font-weight: 600;
+}
+
+.app-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* The theme control (add-theme-setting D6): same select treatment as
+   .provider-picker, right-aligned in the header row beside the log toggle. */
+.theme-picker {
+  padding: 9px 10px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
 }
 
 .app-body {
@@ -85,7 +149,7 @@ body {
 
 /* The active view's navigation item (design D5). */
 .nav-item.active {
-  background: rgba(47, 111, 237, 0.08);
+  background: var(--accent-tint);
   border-color: var(--border);
   color: var(--accent);
   font-weight: 600;
@@ -557,7 +621,7 @@ h1 {
 }
 
 .btn-quiet:hover:not(:disabled) {
-  background: rgba(47, 111, 237, 0.08);
+  background: var(--accent-tint);
 }
 
 .saved-list {
@@ -668,7 +732,7 @@ h1 {
   cursor: pointer;
 }
 
-.mm-manage-btn:hover { background: rgba(47, 111, 237, 0.08); }
+.mm-manage-btn:hover { background: var(--accent-tint); }
 
 .mm-manage-btn:focus-visible {
   outline: 2px solid var(--accent);
@@ -733,7 +797,7 @@ h1 {
   cursor: pointer;
 }
 
-.mm-refresh-btn:hover:not(:disabled) { background: rgba(47, 111, 237, 0.08); }
+.mm-refresh-btn:hover:not(:disabled) { background: var(--accent-tint); }
 
 .mm-refresh-btn:disabled {
   opacity: 0.55;
@@ -775,7 +839,7 @@ h1 {
   cursor: pointer;
 }
 
-.mm-discovered-add:hover:not(:disabled) { background: rgba(47, 111, 237, 0.08); }
+.mm-discovered-add:hover:not(:disabled) { background: var(--accent-tint); }
 
 .mm-discovered-add:disabled {
   opacity: 0.55;

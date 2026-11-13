@@ -10,7 +10,14 @@
   <header class="app-header">
     <div class="app-header-row">
       <span class="app-brand">inj-testing</span>
-      <button id="logs-toggle" class="btn btn-quiet" type="button">Show logs</button>
+      <div class="app-header-actions">
+        <select id="theme-picker" class="theme-picker" aria-label="Color theme">
+          <option value="system">System</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+        <button id="logs-toggle" class="btn btn-quiet" type="button">Show logs</button>
+      </div>
     </div>
     <pre id="log-panel" class="log-panel" hidden tabindex="0" aria-label="Server log"></pre>
   </header>
