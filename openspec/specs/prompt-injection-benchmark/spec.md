@@ -109,7 +109,7 @@ The interface SHALL let the user select one or more configured provider/model co
   - **Pass:** exit code 0, no skipped tests
 
 ### Requirement: Non-persisting preset provider-call endpoint
-The application SHALL expose a `POST /api/llm-call` endpoint that calls a configured provider/model using a server-side system-prompt preset and returns 200 with a `text` field holding the model's output. It SHALL accept a `preset` id, a provider id, a model id, and a `text` body, and the system prompt SHALL come only from the server-side preset registry (which SHALL include the summarization and judge instructions). It SHALL NOT create or modify any file.
+The application SHALL expose a `POST /api/llm-call` endpoint that calls a provider/model from the effective provider configuration (the provider config file plus UI-added overlay models) using a server-side system-prompt preset and returns 200 with a `text` field holding the model's output. It SHALL accept a `preset` id, a provider id, a model id, and a `text` body, and the system prompt SHALL come only from the server-side preset registry (which SHALL include the summarization and judge instructions). It SHALL NOT create or modify any file.
 
 #### Scenario: Returns the model output for a known preset without persisting
 - **WHEN** the endpoint is called with a valid preset, provider, model, and text and the backend returns content
@@ -154,6 +154,15 @@ The application SHALL expose a `POST /api/llm-call` endpoint that calls a config
   - **ID:** T-PROMPT-INJECTION-BENCHMARK-015
   - **File:** tests/test_llm_call_endpoint.py::test_llm_call_respects_concurrency_bound
   - **Command:** uv run python -m pytest tests/test_llm_call_endpoint.py::test_llm_call_respects_concurrency_bound -q
+  - **Pass:** exit code 0, no skipped tests
+
+#### Scenario: A UI-added (overlay) model is accepted
+- **WHEN** the endpoint is called with a valid preset, provider, model, and text where the model id is present in the UI-added model overlay for that provider but not in the provider config file, and the backend returns content
+- **THEN** the backend is called for that provider/model under the provider's configured base URL and the response is 200 with a `text` field equal to the model output
+- **Test Requirement**
+  - **ID:** T-PROMPT-INJECTION-BENCHMARK-039
+  - **File:** tests/test_llm_call_endpoint.py::test_llm_call_accepts_added_model
+  - **Command:** uv run python -m pytest tests/test_llm_call_endpoint.py::test_llm_call_accepts_added_model -q
   - **Pass:** exit code 0, no skipped tests
 
 ### Requirement: Canary success detection

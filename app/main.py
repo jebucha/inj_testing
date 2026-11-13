@@ -553,7 +553,10 @@ def create_app() -> FastAPI:
                 content={"error": {"code": exc.code,
                                    "message": exc.message}},
             )
-        config = await asyncio.to_thread(load_providers)
+        # The merged config is the single source the endpoint validates
+        # against (design D2): overlay-added models are accepted exactly
+        # like file models.
+        config = await asyncio.to_thread(_merged_provider_config)
         if not config.providers:
             error = SummaryNotConfiguredError()
             return JSONResponse(

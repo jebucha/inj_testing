@@ -217,6 +217,25 @@ def test_local_rejections_made_without_backend_call(api):
     assert len(api["dispatch"].calls) == 1
 
 
+def test_llm_call_accepts_added_model(api):
+    """T-PROMPT-INJECTION-BENCHMARK-039"""
+    (api["transcript_dir"] / "provider_overrides.json").write_text(
+        json.dumps({"alpha": ["model-ax"]}), encoding="utf-8"
+    )
+
+    response = api["client"].post(
+        "/api/llm-call", json=_valid_body(model="model-ax")
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"text": "The model output."}
+    # the backend call was made exactly once, with the added model id and
+    # the provider's configured base URL (the overlay never alters it)
+    assert len(api["dispatch"].calls) == 1
+    assert api["dispatch"].calls[0]["model"] == "model-ax"
+    assert api["dispatch"].calls[0]["base_url"] == "http://127.0.0.1:41411/v1"
+
+
 def test_client_supplied_system_prompt_ignored(api):
     """T-PROMPT-INJECTION-BENCHMARK-013"""
     response = api["client"].post(
