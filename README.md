@@ -126,6 +126,25 @@ Open `http://<server-ip>:8000`, paste a YouTube URL, click **Fetch transcript**
 **Show logs** button in the page header toggles a live panel of the
 application's own structured log entries.
 
+## Docs view
+
+The UI is an application shell with a left-pane navigation and two views:
+
+- **Transcripts** (the default view) — the transcript interface described
+  above.
+- **Docs** — the repository's code documentation, displayed in a full-height
+  embedded iframe. The docs' own sidebar navigation works inside it, and the
+  view's toolbar has an **Open docs in new window** link. No documentation
+  HTML is loaded into the application's own page.
+
+The documentation is also available directly at **`/docs/`** (the docs
+landing page; every linked page at its linked path) — a plain static site
+served from the committed, pre-rendered `docs/` directory, no build step at
+serve time.
+
+FastAPI's built-in interactive API documentation is not exposed: the Swagger
+UI at `/docs`, `/redoc`, and `/openapi.json` are no longer served.
+
 ## Smoke test
 
 ```sh
@@ -446,5 +465,5 @@ app/                      FastAPI application
   static/                 index.html, style.css, app.js (no build step, no CDN)
 data/           benchmark dataset (data/benchmark.jsonl; consumed by GET /api/benchmarks)
 tests/          unit/API/logging tests + tests/e2e (Playwright, dev-only)
-docs/           per-file code documentation (open docs/index.html in a browser)
+docs/           per-file code documentation (pre-rendered .html, served at /docs/)
 ```

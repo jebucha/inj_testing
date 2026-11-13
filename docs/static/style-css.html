@@ -39,9 +39,11 @@
 <h1><code>app/static/style.css</code> — the stylesheet</h1>
 <h2>Purpose</h2>
 <p>The single self-contained stylesheet for the UI: the design tokens
-(custom properties on <code>:root</code>), the page layout, and the class styles for
-every region <code>app.js</code> drives. No web fonts, no CDN, no external references
-of any kind — the app's no-CDN constraint applies to CSS as firmly as to JS.</p>
+(custom properties on <code>:root</code>), the application-frame layout (app header,
+left-pane navigation, view panes, and the narrow-viewport collapse), and the
+class styles for every region <code>app.js</code> drives. No web fonts, no CDN, no
+external references of any kind — the app's no-CDN constraint applies to CSS
+as firmly as to JS.</p>
 <h2>Public surface</h2>
 <p>Design tokens: <code>--bg</code>, <code>--panel</code>, <code>--text</code>, <code>--muted</code>, <code>--accent</code>,
 <code>--accent-dark</code>, <code>--error-*</code>, <code>--border</code>. Class/element contract with
@@ -61,7 +63,13 @@ multi-select), <code>.injection-payload</code>, <code>.injection-preview</code> 
 spliced-text preview), <code>.benchmark-tally</code> (the per-model results table),
 <code>.benchmark-rows</code> / <code>.bench-row</code> / <code>.bench-row-title</code> / <code>.bench-output</code> /
 <code>.bench-meta</code> / <code>.bench-human-label</code> / <code>.bench-human</code> (the per-model result
-rows), <code>.log-panel</code>.</p>
+rows), <code>.log-panel</code>, and the application frame: <code>.app-header</code> /
+<code>.app-header-row</code> / <code>.app-brand</code> (the brand + log-toggle row over the log
+panel), <code>.app-body</code> (the nav + main-pane row), <code>.app-nav</code> / <code>.nav-item</code> (the
+left navigation column; <code>.nav-item.active</code> is the active-view state),
+<code>.app-main</code> (the view-pane column), <code>.view</code> (a view section), <code>#view-docs</code> /
+<code>.docs-toolbar</code> / <code>#docs-frame</code> (the Docs view: a toolbar row over an
+iframe that fills the remaining pane height).</p>
 <h2>Invariants</h2>
 <ul>
 <li><strong>Self-contained.</strong> No <code>@import</code>, no web fonts, no external URLs; the
@@ -70,13 +78,30 @@ rows), <code>.log-panel</code>.</p>
 <li><strong><code>[hidden] { display: none !important; }</code> is load-bearing.</strong> It keeps the
   <code>hidden</code> attribute authoritative even for styled elements (buttons and
   panels with display rules), so <code>app.js</code>'s visibility contract can never be
-  silently defeated by a class.</li>
-<li><strong>The header is a column of rows</strong> (<code>flex-direction: column</code>,
-  <code>align-items: stretch</code>): titles + toggle in the first row (<code>.header-row</code>,
-  <code>space-between</code>), the log panel as the second row. Spacing between rows
-  comes from the column's <code>gap</code>, not from the panel's <code>margin-top</code> — the
-  panel sits close beneath the toggle when opened and contributes no height
-  when hidden.</li>
+  silently defeated by a class — including the <code>#view-docs</code> section, which
+  has its own <code>display: flex</code> rule but must stay invisible while <code>hidden</code>.</li>
+<li><strong>The page is a full-height flex column: app header, then the
+  nav + main-pane row.</strong> <code>body</code> is <code>display: flex; flex-direction: column;
+  min-height: 100vh</code>, so the frame fills the viewport when content is short
+  while long Transcripts content still grows the page. <code>.app-body</code> is a
+  row (<code>display: flex</code>) whose <code>.app-nav</code> is a fixed 200px column and whose
+  <code>.app-main</code> is the flexing view-pane column.</li>
+<li><strong>The Docs view's iframe fills the main pane.</strong> <code>#view-docs</code> is a flex
+  column; the toolbar owns the top strip and <code>#docs-frame</code> is
+  <code>flex: 1; min-height: 0</code>, so the iframe takes the pane's full width and
+  remaining height and gives the docs their own scroll context.</li>
+<li><strong>Narrow viewports collapse the nav to a horizontal tab row.</strong> At
+  <code>@media (max-width: 800px)</code> (mirroring the docs' own breakpoint)
+  <code>.app-body</code> becomes a column and <code>.app-nav</code> a full-width row of equal
+  (<code>flex: 1</code>) centered items above the content, so a 420px viewport shows
+  no horizontal overflow.</li>
+<li><strong>The app header is a column of rows</strong> (<code>.app-header</code>,
+  <code>flex-direction: column</code>, <code>align-items: stretch</code>): brand + log toggle in
+  the first row (<code>.app-header-row</code>, <code>space-between</code>), the log panel as the
+  second row. Spacing between rows comes from the column's <code>gap</code>, not from
+  the panel's <code>margin-top</code> — the panel sits close beneath the toggle when
+  opened and contributes no height when hidden. The Transcripts view keeps
+  its own slim <code>.header</code> (title + subtitle only) beneath it.</li>
 <li><strong>Every long region scrolls internally with a bounded height:</strong> the
   transcript panel <code>max-height: 60vh</code>, the summary text and saved list
   <code>40vh</code>, the log panel <code>40vh</code>, the injection spliced-text preview <code>30vh</code> —
@@ -114,6 +139,13 @@ rows), <code>.log-panel</code>.</p>
   re-roll join the control row reusing the existing classes, and the
   <code>.difficulty-error</code> status line is a muted inline failure note (hidden
   except on failure), not the error banner.</li>
+<li><code>add-docs-view</code> <strong>D3</strong> (the Docs view: the toolbar row over
+  <code>#docs-frame</code>, which fills the main pane height so the docs get their own
+  scroll context), <strong>D4</strong> (the app-level frame: the full-height flex-column
+  body, the 200px left nav column beside the flexing main pane, the brand +
+  log viewer in the app header), and <strong>D6</strong> (the <code>@media (max-width: 800px)</code>
+  collapse of the nav into a horizontal tab row, mirroring the docs' own
+  narrow-layout breakpoint and keeping the 420px overflow contract green).</li>
 </ul>
 <h2>Cross-links</h2>
 <ul>

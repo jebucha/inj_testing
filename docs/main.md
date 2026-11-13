@@ -20,12 +20,13 @@ that map module results onto JSON responses.
 - Constants: `MAX_BODY_BYTES` (5 MiB, monkeypatchable in tests),
   `SUMMARIZE_MAX_CONCURRENCY` / `SUMMARIZE_EXECUTOR` (shared by the
   summarization *and* benchmark backend calls), `LOG_POLL_TIMEOUT`,
-  `_listen_port()`.
+  `DOCS_DIR` (the repo's `docs/` directory, mounted at `/docs`), `_listen_port()`.
 - Endpoints: `POST /api/transcript`, `GET /api/transcripts`,
   `GET /api/transcripts/{name}`, `GET /api/transcripts/{name}/summary`,
   `GET /api/providers`, `POST /api/summarize`, `POST /api/llm-call`,
   `GET /api/benchmarks`, `GET /api/settings`, `POST /api/settings`,
-  `GET /api/logs` (SSE), and the static UI mounted at `/`.
+  `GET /api/logs` (SSE), the code-docs site mounted at `/docs` (with a
+  `GET /docs` → `/docs/` redirect), and the static UI mounted at `/`.
 
 ## Invariants
 
@@ -72,7 +73,18 @@ that map module results onto JSON responses.
   leave the server.
 - **Structural name reject (400 `INVALID_NAME`) is applied before any
   filesystem access** on every `{name}` route; a plain miss is a 404.
-- **Static mount is registered last** so the API routes take precedence.
+- **Static mounts are ordered by specificity, API routes first.** The
+  pre-rendered code-docs `StaticFiles` mount at `/docs` is registered after all
+  API routes and *before* the root `/` static mount (Starlette matches routes in
+  registration order), so the docs site owns `/docs/` while the root mount keeps
+  last place and the API routes take precedence. A `GET /docs` without the
+  trailing slash is a registered redirect route to `/docs/` — the root mount
+  would otherwise swallow it before Starlette's built-in directory 307 could fire.
+- **The built-in interactive API documentation is retired.** `FastAPI(...)` is
+  constructed with `docs_url=None`, `redoc_url=None`, and `openapi_url=None`, so
+  the Swagger UI at `/docs`, Redoc, and the OpenAPI schema at `/openapi.json` are
+  no longer served (closes the run-1 security-audit finding). `/docs` belongs to
+  the code-docs site.
 - **Persistence and summary saves are best-effort and post-response:**
   failures are logged, never returned to the client. The fetch response
   always carries the derived `name` (computed, not read back from disk).

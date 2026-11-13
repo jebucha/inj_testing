@@ -39,10 +39,11 @@
 <h1><code>app/static/app.js</code> — the frontend script</h1>
 <h2>Purpose</h2>
 <p>The entire frontend behavior, in one vanilla-JS IIFE with <code>"use strict"</code>:
-fetch flow and result display, copy/download, the saved-transcripts list,
-summarization, the prompt-injection benchmark, and the live log viewer. No
-framework, no build step, no CDN — the file is served as-is at <code>/app.js</code> and
-references DOM ids defined in <code>index.html</code>.</p>
+view navigation (Transcripts / Docs), fetch flow and result display,
+copy/download, the saved-transcripts list, summarization, the prompt-injection
+benchmark, and the live log viewer. No framework, no build step, no CDN —
+the file is served as-is at <code>/app.js</code> and references DOM ids defined in
+<code>index.html</code>.</p>
 <h2>Public surface</h2>
 <p>Nothing is exported (module-scoped IIFE). Its effective API is the set of DOM
 ids it requires from <code>index.html</code>: <code>url-input</code>, <code>fetch-form</code>, <code>fetch-btn</code>,
@@ -56,7 +57,9 @@ ids it requires from <code>index.html</code>: <code>url-input</code>, <code>fetc
 <code>benchmark-reroll</code>, <code>difficulty-error</code>, <code>benchmark-models</code>,
 <code>benchmark-judge</code>, <code>benchmark-run</code>, <code>benchmark-spinner</code>, <code>benchmark-label</code>,
 <code>benchmark-results</code>, <code>benchmark-tally</code>, <code>benchmark-rows</code>, <code>log-panel</code>,
-<code>logs-toggle</code>. It also defines the <code>ERROR_MESSAGES</code> map (server error code
+<code>logs-toggle</code>, and the view-navigation elements <code>nav-transcripts</code>,
+<code>nav-docs</code>, <code>view-transcripts</code>, and <code>view-docs</code>. It also defines the
+<code>ERROR_MESSAGES</code> map (server error code
 → human message) for the eleven taxonomy codes plus <code>NOT_FOUND</code>; the
 dataset-pick errors (<code>INVALID_DIFFICULTY</code>, <code>DATASET_MISSING</code>) surface via
 <code>messageFor</code>'s server-message fallback into the <code>difficulty-error</code> status
@@ -67,6 +70,19 @@ line.</p>
   title, names, summary, log lines) enters the DOM via <code>textContent</code> (or
   element construction) only; never as HTML. Markup-like content from
   YouTube or a backend cannot be rendered or executed.</li>
+<li><strong>View switching is a <code>hidden</code> toggle; the Transcripts content never
+  leaves the DOM.</strong> Clicking a navigation item sets <code>hidden</code> on the other
+  view section and marks the clicked item active (<code>aria-current="page"</code> plus
+  the <code>active</code> CSS class, removed from the other item). Because the
+  Transcripts content stays in the DOM permanently, all in-memory state — a
+  fetched transcript, an in-flight summarization — survives a round trip
+  through the Docs view. The selection is stored nowhere, so a reload always
+  lands on the default Transcripts view.</li>
+<li><strong>The Docs view is display-only for the script.</strong> The documentation is
+  loaded by the iframe's <code>src</code> (a document the app script never reads or
+  writes); the script only toggles the view's visibility and the active
+  marker. The open-in-new-window link is plain markup (<code>target="_blank"</code>),
+  no script involvement.</li>
 <li><strong>Requests use the real file name, display uses a prettified one.</strong> List
   rows keep the real name in <code>data-name</code>; the display label (extension
   stripped, underscores → spaces, CSS capitalization) is cosmetic and is
@@ -259,6 +275,11 @@ for these codes).</p>
   failed-fetch undo that keeps the fresh-panel run button disabled) and
   <strong>decision 3</strong> (the stored entry id is captured at run time and rendered
   on each result row; manual edits do not clear it).</li>
+<li><code>add-docs-view</code> <strong>D5</strong> (the view-switching section: a <code>hidden</code> toggle on
+  the two view sections plus the <code>aria-current</code>/<code>active</code> marker on the
+  clicked nav item — the existing IIFE convention is preserved, the
+  Transcripts content is never removed from the DOM, and no view state is
+  persisted).</li>
 </ul>
 <h2>Cross-links</h2>
 <ul>

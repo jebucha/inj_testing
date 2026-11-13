@@ -60,13 +60,18 @@ for podman parity — works identically under <code>docker build</code> and <cod
   Dockerfile must work under podman which has limited BuildKit support.</li>
 <li><strong>Layer cache discipline.</strong> Dependencies are copied and installed <em>before</em> the
   application code (<code>COPY pyproject.toml uv.lock .</code> then <code>uv sync --frozen --no-dev</code>,
-  then <code>COPY app ./app</code> and <code>COPY data ./data</code>). Changing only source code does
-  not invalidate the dependency install layer.</li>
+  then <code>COPY app ./app</code>, <code>COPY data ./data</code>, and <code>COPY docs ./docs</code>). Changing only
+  source code does not invalidate the dependency install layer.</li>
 <li><strong>The dataset ships in the image.</strong> <code>COPY data ./data</code> lands
   <code>data/benchmark.jsonl</code> at <code>/app/data/benchmark.jsonl</code> next to the app code, so
   the endpoint's CWD-relative default resolves (design decision 1 of the
   <code>benchmark-difficulty-picker</code> change); without it the benchmark dataset
   endpoint would always return 404 in the container.</li>
+<li><strong>The code documentation ships in the image.</strong> <code>COPY docs ./docs</code> lands the
+  pre-rendered docs at <code>/app/docs</code> next to the app code; <code>app/main.py</code> mounts
+  them at <code>/docs/</code> and fails fast at startup if the directory is missing
+  (Starlette validates the mount directory), so the container would not start
+  without this copy.</li>
 <li><strong><code>--no-dev</code> in both build and runtime.</strong> The dev dependency group (pytest,
   playwright, markdown) is never installed — the image contains only runtime
   dependencies from the main group. This matches the compose healthcheck and log
@@ -97,6 +102,7 @@ streaming impossible.</p>
 <p>Also from later changes:
 - <code>add-transcript-summary</code> decision on provider config mount path compatibility with the image's <code>/app</code> working directory
 - <code>benchmark-difficulty-picker</code> decision 1 — <code>COPY data ./data</code> so the endpoint's CWD-relative dataset default resolves inside the container (<code>/app/data/benchmark.jsonl</code>)
+- <code>add-docs-view</code> decision 7 — <code>COPY docs ./docs</code> so the pre-rendered code docs served at <code>/docs/</code> ship in the image
 - <code>2026-10-30-migrate-to-uv</code> — uv is now the dependency manager, reflected in the sync command</p>
 <h2>Cross-links</h2>
 <ul>

@@ -13,7 +13,7 @@ from pathlib import Path
 from queue import Empty
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -51,6 +51,7 @@ from app.providers import load_providers
 from app.settings import load_settings, save_settings
 
 STATIC_DIR = Path(__file__).parent / "static"
+DOCS_DIR = Path(__file__).resolve().parent.parent / "docs"
 DEFAULT_PORT = 8000
 
 # How long a log stream waits for the next entry before looping again. The
@@ -138,7 +139,15 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="inj-testing", lifespan=lifespan)
+    # The built-in interactive API documentation (Swagger/Redoc/OpenAPI) is
+    # retired: /docs belongs to the code-docs site (design D1-D2).
+    app = FastAPI(
+        title="inj-testing",
+        docs_url=None,
+        redoc_url=None,
+        openapi_url=None,
+        lifespan=lifespan,
+    )
     applog.install_excepthook()
 
     # Registered before the logging middleware (Starlette applies the
@@ -636,6 +645,18 @@ def create_app() -> FastAPI:
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
 
+    @app.get("/docs")
+    async def docs_redirect() -> RedirectResponse:
+        # The root static mount below would swallow /docs (no trailing
+        # slash), so Starlette's built-in directory 307 never fires: land
+        # the client on the docs site explicitly (design D1).
+        return RedirectResponse("/docs/", status_code=307)
+
+    # The pre-rendered code-docs site: registered before the root static
+    # mount so the docs site wins the /docs/ path (Starlette matches routes
+    # in registration order; html=True serves index.html as the directory
+    # index). design D1.
+    app.mount("/docs", StaticFiles(directory=DOCS_DIR, html=True), name="docs")
     # Mounted last so the API routes above take precedence.
     app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
     return app

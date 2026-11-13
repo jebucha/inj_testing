@@ -40,9 +40,15 @@
 <h2>Purpose</h2>
 <p>The entire web UI's markup: one page, no framework, no build step, no CDN.
 It defines the DOM contract that <code>app.js</code> consumes — every id the script
-reaches for — and the visible structure: header (with the log viewer), the
-fetch form, the error banner, the result section (transcript panel, summary
-panel, and the injection-benchmark panel), and the saved-transcripts section.</p>
+reaches for — and the visible structure. The page is an application frame:
+an app header (the <code>inj-testing</code> brand, the "Show logs" toggle, and the log
+viewer), a left-pane navigation with two items ("Transcripts" and "Docs"),
+and a main pane holding two view sections. The Transcripts view
+(<code>#view-transcripts</code>) contains the entire original interface — the "YouTube
+Transcript" title and subtitle, the fetch form, the error banner, the result
+section (transcript panel, summary panel, and the injection-benchmark
+panel), and the saved-transcripts section. The Docs view (<code>#view-docs</code>,
+hidden by default) displays the code documentation in an embedded iframe.</p>
 <h2>Public surface</h2>
 <p>The asset set is exactly three files referenced with absolute paths:
 <code>/style.css</code>, <code>/app.js</code>, and this page (served by the static mount at <code>/</code>).
@@ -73,6 +79,13 @@ The effective API is the id/class contract with <code>app.js</code>:</p>
   <code>benchmark-results</code>, <code>benchmark-tally</code> (the per-model table), and
   <code>benchmark-rows</code> (the per-model result rows).</li>
 <li>Log viewer: <code>logs-toggle</code>, <code>log-panel</code>.</li>
+<li>Application frame and view navigation: <code>app-header</code>, <code>app-brand</code>,
+  <code>app-body</code>, <code>app-nav</code>, <code>nav-transcripts</code>, <code>nav-docs</code> (the two navigation
+  items; the active one carries <code>aria-current="page"</code> and the <code>active</code>
+  class), <code>app-main</code>, <code>view-transcripts</code> (the Transcripts view section,
+  default visible), <code>view-docs</code> (the Docs view section, <code>hidden</code> by
+  default), <code>docs-toolbar</code>, <code>docs-open-new</code> (the open-in-new-window link),
+  and <code>docs-frame</code> (the iframe whose <code>src</code> is <code>/docs/</code>).</li>
 </ul>
 <h2>Invariants</h2>
 <ul>
@@ -82,10 +95,26 @@ The effective API is the id/class contract with <code>app.js</code>:</p>
 <li><strong>The <code>hidden</code> attribute is the visibility contract</strong>, and the CSS rule
   <code>[hidden] { display: none !important; }</code> in <code>style.css</code> keeps it
   authoritative even for styled elements. <code>app.js</code> toggles only <code>hidden</code>.</li>
-<li><strong>The log panel lives in the header, as the header's second row</strong> — not
-  at the bottom of the page flow — so opening it never requires scrolling.
-  The header is a column of rows (titles + toggle on the first row, panel
-  on the second), with row gap providing the spacing.</li>
+<li><strong>The log panel is app-level, in the app header's second row</strong> — not
+  inside either view and not at the bottom of the page flow — so opening it
+  never requires scrolling and it stays available in both views. The header
+  is a column of rows (brand + toggle on the first row, panel on the
+  second), with row gap providing the spacing.</li>
+<li><strong>The frame is header → body row of left nav + main pane.</strong> The view
+  sections live inside <code>app-main</code>; the Transcripts view is the default
+  (visible) view and holds the whole original interface unchanged, including
+  the "YouTube Transcript" h1 and subtitle, which are view-specific (they
+  belong to the Transcripts view, not the app header).</li>
+<li><strong>The Docs view holds only its toolbar and the iframe.</strong> The toolbar's
+  single control is the open-in-new-window anchor (<code>href="/docs/"</code>,
+  <code>target="_blank"</code>); the documentation is displayed exclusively through
+  <code>#docs-frame</code>'s <code>src</code> — no docs HTML is ever inserted into the
+  application's DOM (the docs' own sidebar navigation lives in the iframe's
+  document).</li>
+<li><strong>View switching is <code>hidden</code>-toggled and unmarked in state.</strong> The
+  <code>hidden</code> attribute on the view sections plus the active marker on the nav
+  items is the entire contract; nothing about the selected view is stored,
+  so a reload always lands on the Transcripts view.</li>
 <li><strong>Accessibility is structural, not script-added:</strong> <code>role="alert"</code> on the
   error banner, <code>aria-label</code>s on the input, panels, and provider picker,
   <code>tabindex="0"</code> on the scrollable <code>&lt;pre&gt;</code> panels, <code>type="button"</code> on
@@ -135,6 +164,14 @@ humanized server log lines.</p>
   usable) and <strong>decision 4</strong> (the picker and re-roll reuse the existing
   <code>benchmark-label</code>/<code>btn</code> classes, and the hidden <code>difficulty-error</code> status
   line sits beside them).</li>
+<li><code>add-docs-view</code> <strong>D3</strong> (the Docs view is a full-height <code>&lt;iframe src="/docs/"&gt;</code>
+  — the only approach that displays the full-document doc pages unchanged
+  and keeps their own sidebar navigation functional, with no docs HTML in
+  the app DOM), <strong>D4</strong> (the app-level frame: brand + log viewer in the
+  header, left nav with the two view sections in the main pane; the
+  view-specific title/subtitle move into the Transcripts view), and <strong>D5</strong>
+  (the Transcripts content moves in unchanged; view switching is a
+  <code>hidden</code> toggle with the <code>aria-current</code>/<code>active</code> marker, no persistence).</li>
 </ul>
 <h2>Cross-links</h2>
 <ul>

@@ -43,7 +43,9 @@ One page per Python module, one per static UI file, one per deploy/config file â
 module-level and invariant-forward: what each file is <em>for</em>, the rules that must
 keep holding, and the "design decision N" items behind them (resolved from the
 archived change design docs under <code>openspec/changes/archive/</code>). Written for a
-returning human and for an AI agent working the repo; open this file in a browser.</p>
+returning human and for an AI agent working the repo. The running application
+serves this site at <code>/docs/</code> (the landing page at <code>/docs/</code>); the files on disk
+are the generated source, not the thing to open in a browser by hand.</p>
 <h2>System flow</h2>
 <pre><code>browser (app/static: index.html + app.js + style.css - no build, no CDN)
   |

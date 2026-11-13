@@ -3,10 +3,11 @@
 ## Purpose
 
 The entire frontend behavior, in one vanilla-JS IIFE with `"use strict"`:
-fetch flow and result display, copy/download, the saved-transcripts list,
-summarization, the prompt-injection benchmark, and the live log viewer. No
-framework, no build step, no CDN — the file is served as-is at `/app.js` and
-references DOM ids defined in `index.html`.
+view navigation (Transcripts / Docs), fetch flow and result display,
+copy/download, the saved-transcripts list, summarization, the prompt-injection
+benchmark, and the live log viewer. No framework, no build step, no CDN —
+the file is served as-is at `/app.js` and references DOM ids defined in
+`index.html`.
 
 ## Public surface
 
@@ -22,7 +23,9 @@ ids it requires from `index.html`: `url-input`, `fetch-form`, `fetch-btn`,
 `benchmark-reroll`, `difficulty-error`, `benchmark-models`,
 `benchmark-judge`, `benchmark-run`, `benchmark-spinner`, `benchmark-label`,
 `benchmark-results`, `benchmark-tally`, `benchmark-rows`, `log-panel`,
-`logs-toggle`. It also defines the `ERROR_MESSAGES` map (server error code
+`logs-toggle`, and the view-navigation elements `nav-transcripts`,
+`nav-docs`, `view-transcripts`, and `view-docs`. It also defines the
+`ERROR_MESSAGES` map (server error code
 → human message) for the eleven taxonomy codes plus `NOT_FOUND`; the
 dataset-pick errors (`INVALID_DIFFICULTY`, `DATASET_MISSING`) surface via
 `messageFor`'s server-message fallback into the `difficulty-error` status
@@ -34,6 +37,19 @@ line.
   title, names, summary, log lines) enters the DOM via `textContent` (or
   element construction) only; never as HTML. Markup-like content from
   YouTube or a backend cannot be rendered or executed.
+- **View switching is a `hidden` toggle; the Transcripts content never
+  leaves the DOM.** Clicking a navigation item sets `hidden` on the other
+  view section and marks the clicked item active (`aria-current="page"` plus
+  the `active` CSS class, removed from the other item). Because the
+  Transcripts content stays in the DOM permanently, all in-memory state — a
+  fetched transcript, an in-flight summarization — survives a round trip
+  through the Docs view. The selection is stored nowhere, so a reload always
+  lands on the default Transcripts view.
+- **The Docs view is display-only for the script.** The documentation is
+  loaded by the iframe's `src` (a document the app script never reads or
+  writes); the script only toggles the view's visibility and the active
+  marker. The open-in-new-window link is plain markup (`target="_blank"`),
+  no script involvement.
 - **Requests use the real file name, display uses a prettified one.** List
   rows keep the real name in `data-name`; the display label (extension
   stripped, underscores → spaces, CSS capitalization) is cosmetic and is
@@ -231,6 +247,11 @@ Resolved from the archived change design docs:
   failed-fetch undo that keeps the fresh-panel run button disabled) and
   **decision 3** (the stored entry id is captured at run time and rendered
   on each result row; manual edits do not clear it).
+- `add-docs-view` **D5** (the view-switching section: a `hidden` toggle on
+  the two view sections plus the `aria-current`/`active` marker on the
+  clicked nav item — the existing IIFE convention is preserved, the
+  Transcripts content is never removed from the DOM, and no view state is
+  persisted).
 
 ## Cross-links
 

@@ -55,12 +55,13 @@ that map module results onto JSON responses.</p>
 <li>Constants: <code>MAX_BODY_BYTES</code> (5 MiB, monkeypatchable in tests),
   <code>SUMMARIZE_MAX_CONCURRENCY</code> / <code>SUMMARIZE_EXECUTOR</code> (shared by the
   summarization <em>and</em> benchmark backend calls), <code>LOG_POLL_TIMEOUT</code>,
-  <code>_listen_port()</code>.</li>
+  <code>DOCS_DIR</code> (the repo's <code>docs/</code> directory, mounted at <code>/docs</code>), <code>_listen_port()</code>.</li>
 <li>Endpoints: <code>POST /api/transcript</code>, <code>GET /api/transcripts</code>,
   <code>GET /api/transcripts/{name}</code>, <code>GET /api/transcripts/{name}/summary</code>,
   <code>GET /api/providers</code>, <code>POST /api/summarize</code>, <code>POST /api/llm-call</code>,
   <code>GET /api/benchmarks</code>, <code>GET /api/settings</code>, <code>POST /api/settings</code>,
-  <code>GET /api/logs</code> (SSE), and the static UI mounted at <code>/</code>.</li>
+  <code>GET /api/logs</code> (SSE), the code-docs site mounted at <code>/docs</code> (with a
+  <code>GET /docs</code> → <code>/docs/</code> redirect), and the static UI mounted at <code>/</code>.</li>
 </ul>
 <h2>Invariants</h2>
 <ul>
@@ -107,7 +108,18 @@ that map module results onto JSON responses.</p>
   leave the server.</li>
 <li><strong>Structural name reject (400 <code>INVALID_NAME</code>) is applied before any
   filesystem access</strong> on every <code>{name}</code> route; a plain miss is a 404.</li>
-<li><strong>Static mount is registered last</strong> so the API routes take precedence.</li>
+<li><strong>Static mounts are ordered by specificity, API routes first.</strong> The
+  pre-rendered code-docs <code>StaticFiles</code> mount at <code>/docs</code> is registered after all
+  API routes and <em>before</em> the root <code>/</code> static mount (Starlette matches routes in
+  registration order), so the docs site owns <code>/docs/</code> while the root mount keeps
+  last place and the API routes take precedence. A <code>GET /docs</code> without the
+  trailing slash is a registered redirect route to <code>/docs/</code> — the root mount
+  would otherwise swallow it before Starlette's built-in directory 307 could fire.</li>
+<li><strong>The built-in interactive API documentation is retired.</strong> <code>FastAPI(...)</code> is
+  constructed with <code>docs_url=None</code>, <code>redoc_url=None</code>, and <code>openapi_url=None</code>, so
+  the Swagger UI at <code>/docs</code>, Redoc, and the OpenAPI schema at <code>/openapi.json</code> are
+  no longer served (closes the run-1 security-audit finding). <code>/docs</code> belongs to
+  the code-docs site.</li>
 <li><strong>Persistence and summary saves are best-effort and post-response:</strong>
   failures are logged, never returned to the client. The fetch response
   always carries the derived <code>name</code> (computed, not read back from disk).</li>

@@ -1669,6 +1669,38 @@
     // EventSource reconnects automatically; nothing to do on error.
   }
 
+  /* --- View navigation (Transcripts / Docs) -----------------------------------
+   * Switching is a `hidden` toggle on the two view sections plus the active
+   * marker on the clicked nav item (aria-current="page" + the CSS active
+   * class, removed from the other item). The Transcripts content never leaves
+   * the DOM, so fetched state survives a round trip through the Docs view
+   * (design D5). The selection is not persisted anywhere: a reload lands on
+   * the default Transcripts view. */
+
+  var navTranscripts = document.getElementById("nav-transcripts");
+  var navDocs = document.getElementById("nav-docs");
+  var viewTranscripts = document.getElementById("view-transcripts");
+  var viewDocs = document.getElementById("view-docs");
+
+  function showView(viewEl, navEl) {
+    var otherView = viewEl === viewTranscripts ? viewDocs : viewTranscripts;
+    var otherNav = viewEl === viewTranscripts ? navDocs : navTranscripts;
+    viewEl.hidden = false;
+    otherView.hidden = true;
+    navEl.setAttribute("aria-current", "page");
+    navEl.classList.add("active");
+    otherNav.removeAttribute("aria-current");
+    otherNav.classList.remove("active");
+  }
+
+  navTranscripts.addEventListener("click", function () {
+    showView(viewTranscripts, navTranscripts);
+  });
+
+  navDocs.addEventListener("click", function () {
+    showView(viewDocs, navDocs);
+  });
+
   // Load once on page load. There is no automatic polling (design decision 6).
   loadSavedList();
   loadProviders();

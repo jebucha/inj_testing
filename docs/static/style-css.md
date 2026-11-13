@@ -3,9 +3,11 @@
 ## Purpose
 
 The single self-contained stylesheet for the UI: the design tokens
-(custom properties on `:root`), the page layout, and the class styles for
-every region `app.js` drives. No web fonts, no CDN, no external references
-of any kind — the app's no-CDN constraint applies to CSS as firmly as to JS.
+(custom properties on `:root`), the application-frame layout (app header,
+left-pane navigation, view panes, and the narrow-viewport collapse), and the
+class styles for every region `app.js` drives. No web fonts, no CDN, no
+external references of any kind — the app's no-CDN constraint applies to CSS
+as firmly as to JS.
 
 ## Public surface
 
@@ -27,7 +29,13 @@ multi-select), `.injection-payload`, `.injection-preview` (the dashed
 spliced-text preview), `.benchmark-tally` (the per-model results table),
 `.benchmark-rows` / `.bench-row` / `.bench-row-title` / `.bench-output` /
 `.bench-meta` / `.bench-human-label` / `.bench-human` (the per-model result
-rows), `.log-panel`.
+rows), `.log-panel`, and the application frame: `.app-header` /
+`.app-header-row` / `.app-brand` (the brand + log-toggle row over the log
+panel), `.app-body` (the nav + main-pane row), `.app-nav` / `.nav-item` (the
+left navigation column; `.nav-item.active` is the active-view state),
+`.app-main` (the view-pane column), `.view` (a view section), `#view-docs` /
+`.docs-toolbar` / `#docs-frame` (the Docs view: a toolbar row over an
+iframe that fills the remaining pane height).
 
 ## Invariants
 
@@ -37,13 +45,30 @@ rows), `.log-panel`.
 - **`[hidden] { display: none !important; }` is load-bearing.** It keeps the
   `hidden` attribute authoritative even for styled elements (buttons and
   panels with display rules), so `app.js`'s visibility contract can never be
-  silently defeated by a class.
-- **The header is a column of rows** (`flex-direction: column`,
-  `align-items: stretch`): titles + toggle in the first row (`.header-row`,
-  `space-between`), the log panel as the second row. Spacing between rows
-  comes from the column's `gap`, not from the panel's `margin-top` — the
-  panel sits close beneath the toggle when opened and contributes no height
-  when hidden.
+  silently defeated by a class — including the `#view-docs` section, which
+  has its own `display: flex` rule but must stay invisible while `hidden`.
+- **The page is a full-height flex column: app header, then the
+  nav + main-pane row.** `body` is `display: flex; flex-direction: column;
+  min-height: 100vh`, so the frame fills the viewport when content is short
+  while long Transcripts content still grows the page. `.app-body` is a
+  row (`display: flex`) whose `.app-nav` is a fixed 200px column and whose
+  `.app-main` is the flexing view-pane column.
+- **The Docs view's iframe fills the main pane.** `#view-docs` is a flex
+  column; the toolbar owns the top strip and `#docs-frame` is
+  `flex: 1; min-height: 0`, so the iframe takes the pane's full width and
+  remaining height and gives the docs their own scroll context.
+- **Narrow viewports collapse the nav to a horizontal tab row.** At
+  `@media (max-width: 800px)` (mirroring the docs' own breakpoint)
+  `.app-body` becomes a column and `.app-nav` a full-width row of equal
+  (`flex: 1`) centered items above the content, so a 420px viewport shows
+  no horizontal overflow.
+- **The app header is a column of rows** (`.app-header`,
+  `flex-direction: column`, `align-items: stretch`): brand + log toggle in
+  the first row (`.app-header-row`, `space-between`), the log panel as the
+  second row. Spacing between rows comes from the column's `gap`, not from
+  the panel's `margin-top` — the panel sits close beneath the toggle when
+  opened and contributes no height when hidden. The Transcripts view keeps
+  its own slim `.header` (title + subtitle only) beneath it.
 - **Every long region scrolls internally with a bounded height:** the
   transcript panel `max-height: 60vh`, the summary text and saved list
   `40vh`, the log panel `40vh`, the injection spliced-text preview `30vh` —
@@ -86,6 +111,13 @@ Resolved from the archived change design docs:
   re-roll join the control row reusing the existing classes, and the
   `.difficulty-error` status line is a muted inline failure note (hidden
   except on failure), not the error banner.
+- `add-docs-view` **D3** (the Docs view: the toolbar row over
+  `#docs-frame`, which fills the main pane height so the docs get their own
+  scroll context), **D4** (the app-level frame: the full-height flex-column
+  body, the 200px left nav column beside the flexing main pane, the brand +
+  log viewer in the app header), and **D6** (the `@media (max-width: 800px)`
+  collapse of the nav into a horizontal tab row, mirroring the docs' own
+  narrow-layout breakpoint and keeping the 420px overflow contract green).
 
 ## Cross-links
 

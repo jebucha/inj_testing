@@ -21,6 +21,9 @@ COPY app ./app
 # /app/data/benchmark.jsonl in the container).
 COPY data ./data
 
+# Pre-rendered code documentation, served by the app at /docs/ (design D7).
+COPY docs ./docs
+
 # Run as an unprivileged user.
 RUN useradd --create-home --shell /usr/sbin/nologin appuser \
     && chown -R appuser:appuser /app

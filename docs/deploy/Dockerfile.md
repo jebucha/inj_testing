@@ -25,13 +25,18 @@ for podman parity — works identically under `docker build` and `podman build`.
   Dockerfile must work under podman which has limited BuildKit support.
 - **Layer cache discipline.** Dependencies are copied and installed *before* the
   application code (`COPY pyproject.toml uv.lock .` then `uv sync --frozen --no-dev`,
-  then `COPY app ./app` and `COPY data ./data`). Changing only source code does
-  not invalidate the dependency install layer.
+  then `COPY app ./app`, `COPY data ./data`, and `COPY docs ./docs`). Changing only
+  source code does not invalidate the dependency install layer.
 - **The dataset ships in the image.** `COPY data ./data` lands
   `data/benchmark.jsonl` at `/app/data/benchmark.jsonl` next to the app code, so
   the endpoint's CWD-relative default resolves (design decision 1 of the
   `benchmark-difficulty-picker` change); without it the benchmark dataset
   endpoint would always return 404 in the container.
+- **The code documentation ships in the image.** `COPY docs ./docs` lands the
+  pre-rendered docs at `/app/docs` next to the app code; `app/main.py` mounts
+  them at `/docs/` and fails fast at startup if the directory is missing
+  (Starlette validates the mount directory), so the container would not start
+  without this copy.
 - **`--no-dev` in both build and runtime.** The dev dependency group (pytest,
   playwright, markdown) is never installed — the image contains only runtime
   dependencies from the main group. This matches the compose healthcheck and log
@@ -68,6 +73,7 @@ Resolved from `2026-10-29-add-docker-compose` (archived design doc):
 Also from later changes:
 - `add-transcript-summary` decision on provider config mount path compatibility with the image's `/app` working directory
 - `benchmark-difficulty-picker` decision 1 — `COPY data ./data` so the endpoint's CWD-relative dataset default resolves inside the container (`/app/data/benchmark.jsonl`)
+- `add-docs-view` decision 7 — `COPY docs ./docs` so the pre-rendered code docs served at `/docs/` ship in the image
 - `2026-10-30-migrate-to-uv` — uv is now the dependency manager, reflected in the sync command
 
 ## Cross-links

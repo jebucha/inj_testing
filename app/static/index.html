@@ -7,154 +7,175 @@
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
-  <main class="container">
-    <div class="header">
-      <div class="header-row">
-        <div class="header-titles">
-          <h1>YouTube Transcript</h1>
-          <p class="subtitle">Paste a YouTube video URL to get its caption transcript.</p>
-        </div>
-        <button id="logs-toggle" class="btn btn-quiet" type="button">Show logs</button>
-      </div>
-
-      <pre id="log-panel" class="log-panel" hidden tabindex="0" aria-label="Server log"></pre>
+  <header class="app-header">
+    <div class="app-header-row">
+      <span class="app-brand">inj-testing</span>
+      <button id="logs-toggle" class="btn btn-quiet" type="button">Show logs</button>
     </div>
+    <pre id="log-panel" class="log-panel" hidden tabindex="0" aria-label="Server log"></pre>
+  </header>
 
-    <form id="fetch-form" class="row">
-      <input
-        id="url-input"
-        class="url-input"
-        type="text"
-        inputmode="url"
-        placeholder="https://www.youtube.com/watch?v=…"
-        autocomplete="off"
-        spellcheck="false"
-        aria-label="YouTube video URL"
-      />
-      <button id="fetch-btn" class="btn" type="submit">
-        <span id="fetch-spinner" class="spinner" hidden aria-hidden="true"></span>
-        <span id="fetch-label">Fetch transcript</span>
-      </button>
-    </form>
+  <div class="app-body">
+    <nav class="app-nav" aria-label="Views">
+      <button id="nav-transcripts" class="nav-item active" type="button"
+              aria-current="page">Transcripts</button>
+      <button id="nav-docs" class="nav-item" type="button">Docs</button>
+    </nav>
 
-    <div id="error-banner" class="error-banner" role="alert" hidden></div>
-
-    <section id="model-management" class="model-management"
-             aria-labelledby="mm-title">
-      <h2 id="mm-title" class="mm-title">Summarization models</h2>
-      <p id="mm-empty" class="mm-empty" hidden>
-        No summarization providers are configured.
-      </p>
-      <div id="mm-provider-list" class="mm-provider-list"></div>
-    </section>
-
-    <section id="result" hidden>
-      <div class="result-header">
-        <div class="result-meta">
-          <h2 id="video-title" class="video-title"></h2>
-          <span id="video-language" class="video-language"></span>
+    <main class="app-main">
+      <section id="view-transcripts" class="view container">
+        <div class="header">
+          <div class="header-titles">
+            <h1>YouTube Transcript</h1>
+            <p class="subtitle">Paste a YouTube video URL to get its caption transcript.</p>
+          </div>
         </div>
-        <div class="result-actions">
-          <button id="copy-btn" class="btn" disabled>Copy transcript</button>
-          <button id="download-btn" class="btn" disabled>Download</button>
-          <select id="provider-picker" class="provider-picker"
-                  aria-label="Summarization provider and model" disabled></select>
-          <label id="auto-summarize-label" class="auto-summarize-label">
-            <input id="auto-summarize" type="checkbox" disabled />
-            <span>Auto-summarize</span>
-          </label>
-          <button id="summarize-btn" class="btn" type="button" disabled>
-            <span id="summarize-spinner" class="spinner" hidden aria-hidden="true"></span>
-            <span id="summarize-label">Summarize</span>
+
+        <form id="fetch-form" class="row">
+          <input
+            id="url-input"
+            class="url-input"
+            type="text"
+            inputmode="url"
+            placeholder="https://www.youtube.com/watch?v=…"
+            autocomplete="off"
+            spellcheck="false"
+            aria-label="YouTube video URL"
+          />
+          <button id="fetch-btn" class="btn" type="submit">
+            <span id="fetch-spinner" class="spinner" hidden aria-hidden="true"></span>
+            <span id="fetch-label">Fetch transcript</span>
           </button>
-        </div>
-      </div>
-      <p id="auto-summarize-note" class="auto-note" hidden></p>
-      <pre id="transcript-panel" class="transcript-panel" tabindex="0"></pre>
-      <section id="summary-panel" class="summary-panel" hidden aria-label="Summary">
-        <div class="summary-header">
-          <h3 class="summary-title">Summary</h3>
-          <button id="summary-copy-btn" class="btn btn-quiet" type="button" disabled>
-            Copy summary
-          </button>
-        </div>
-        <pre id="summary-text" class="summary-text" tabindex="0"></pre>
+        </form>
+
+        <div id="error-banner" class="error-banner" role="alert" hidden></div>
+
+        <section id="model-management" class="model-management"
+                 aria-labelledby="mm-title">
+          <h2 id="mm-title" class="mm-title">Summarization models</h2>
+          <p id="mm-empty" class="mm-empty" hidden>
+            No summarization providers are configured.
+          </p>
+          <div id="mm-provider-list" class="mm-provider-list"></div>
+        </section>
+
+        <section id="result" hidden>
+          <div class="result-header">
+            <div class="result-meta">
+              <h2 id="video-title" class="video-title"></h2>
+              <span id="video-language" class="video-language"></span>
+            </div>
+            <div class="result-actions">
+              <button id="copy-btn" class="btn" disabled>Copy transcript</button>
+              <button id="download-btn" class="btn" disabled>Download</button>
+              <select id="provider-picker" class="provider-picker"
+                      aria-label="Summarization provider and model" disabled></select>
+              <label id="auto-summarize-label" class="auto-summarize-label">
+                <input id="auto-summarize" type="checkbox" disabled />
+                <span>Auto-summarize</span>
+              </label>
+              <button id="summarize-btn" class="btn" type="button" disabled>
+                <span id="summarize-spinner" class="spinner" hidden aria-hidden="true"></span>
+                <span id="summarize-label">Summarize</span>
+              </button>
+            </div>
+          </div>
+          <p id="auto-summarize-note" class="auto-note" hidden></p>
+          <pre id="transcript-panel" class="transcript-panel" tabindex="0"></pre>
+          <section id="summary-panel" class="summary-panel" hidden aria-label="Summary">
+            <div class="summary-header">
+              <h3 class="summary-title">Summary</h3>
+              <button id="summary-copy-btn" class="btn btn-quiet" type="button" disabled>
+                Copy summary
+              </button>
+            </div>
+            <pre id="summary-text" class="summary-text" tabindex="0"></pre>
+          </section>
+          <section id="injection-panel" class="injection-panel" aria-label="Injection benchmark">
+            <div class="injection-controls">
+              <label id="injection-toggle-label" class="injection-toggle-label">
+                <input id="injection-toggle" type="checkbox" disabled />
+                <span>Injection</span>
+              </label>
+              <select id="injection-point" class="injection-point" disabled
+                      aria-label="Payload insertion point">
+                <option value="prepend">Prepend</option>
+                <option value="middle">Middle</option>
+                <option value="append" selected>Append</option>
+              </select>
+              <label class="benchmark-label">Difficulty
+                <select id="difficulty-picker" class="difficulty-picker" disabled
+                        aria-label="Benchmark dataset difficulty">
+                  <option value="manual" selected>Manual payload</option>
+                  <option value="easy">Easy</option>
+                  <option value="medium">Medium</option>
+                  <option value="hard">Hard</option>
+                </select>
+              </label>
+              <button id="benchmark-reroll" class="btn" type="button" disabled
+                      title="Fetch a new random payload for the selected difficulty">
+                Re-roll
+              </button>
+              <span id="difficulty-error" class="difficulty-error" hidden></span>
+              <label class="benchmark-label">Models
+                <select id="benchmark-models" class="benchmark-models" multiple size="3"
+                        disabled aria-label="Benchmark models"></select>
+              </label>
+              <label class="benchmark-label">Judge
+                <select id="benchmark-judge" class="benchmark-judge" disabled
+                        aria-label="Judge provider and model"></select>
+              </label>
+              <button id="benchmark-run" class="btn" type="button" disabled>
+                <span id="benchmark-spinner" class="spinner" hidden aria-hidden="true"></span>
+                <span id="benchmark-label">Run benchmark</span>
+              </button>
+            </div>
+            <textarea id="injection-payload" class="injection-payload" rows="3"
+                      placeholder="Attacker payload — spliced into the transcript as plain text"
+                      disabled hidden></textarea>
+            <pre id="injection-preview" class="injection-preview" hidden tabindex="0"></pre>
+            <div id="benchmark-results" class="benchmark-results" hidden>
+              <table id="benchmark-tally" class="benchmark-tally">
+                <thead>
+                  <tr>
+                    <th>Model</th>
+                    <th>Runs</th>
+                    <th>Canary hit</th>
+                    <th>Judge compliance</th>
+                    <th>Human-confirmed</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <div id="benchmark-rows" class="benchmark-rows"></div>
+            </div>
+          </section>
+        </section>
+
+        <section id="saved" class="saved-section" aria-labelledby="saved-title">
+          <div class="saved-header">
+            <h2 id="saved-title" class="saved-title">
+              Saved transcripts <span id="saved-count" class="saved-count"></span>
+            </h2>
+            <button id="saved-refresh-btn" class="btn btn-quiet" type="button">
+              Refresh
+            </button>
+          </div>
+          <ul id="saved-list" class="saved-list" hidden></ul>
+          <p id="saved-empty" class="saved-empty" hidden>No transcripts saved yet.</p>
+        </section>
+
       </section>
-      <section id="injection-panel" class="injection-panel" aria-label="Injection benchmark">
-        <div class="injection-controls">
-          <label id="injection-toggle-label" class="injection-toggle-label">
-            <input id="injection-toggle" type="checkbox" disabled />
-            <span>Injection</span>
-          </label>
-          <select id="injection-point" class="injection-point" disabled
-                  aria-label="Payload insertion point">
-            <option value="prepend">Prepend</option>
-            <option value="middle">Middle</option>
-            <option value="append" selected>Append</option>
-          </select>
-          <label class="benchmark-label">Difficulty
-            <select id="difficulty-picker" class="difficulty-picker" disabled
-                    aria-label="Benchmark dataset difficulty">
-              <option value="manual" selected>Manual payload</option>
-              <option value="easy">Easy</option>
-              <option value="medium">Medium</option>
-              <option value="hard">Hard</option>
-            </select>
-          </label>
-          <button id="benchmark-reroll" class="btn" type="button" disabled
-                  title="Fetch a new random payload for the selected difficulty">
-            Re-roll
-          </button>
-          <span id="difficulty-error" class="difficulty-error" hidden></span>
-          <label class="benchmark-label">Models
-            <select id="benchmark-models" class="benchmark-models" multiple size="3"
-                    disabled aria-label="Benchmark models"></select>
-          </label>
-          <label class="benchmark-label">Judge
-            <select id="benchmark-judge" class="benchmark-judge" disabled
-                    aria-label="Judge provider and model"></select>
-          </label>
-          <button id="benchmark-run" class="btn" type="button" disabled>
-            <span id="benchmark-spinner" class="spinner" hidden aria-hidden="true"></span>
-            <span id="benchmark-label">Run benchmark</span>
-          </button>
+
+      <section id="view-docs" class="view" hidden>
+        <div class="docs-toolbar">
+          <a id="docs-open-new" class="btn btn-quiet" href="/docs/"
+             target="_blank" rel="noopener">Open docs in new window</a>
         </div>
-        <textarea id="injection-payload" class="injection-payload" rows="3"
-                  placeholder="Attacker payload — spliced into the transcript as plain text"
-                  disabled hidden></textarea>
-        <pre id="injection-preview" class="injection-preview" hidden tabindex="0"></pre>
-        <div id="benchmark-results" class="benchmark-results" hidden>
-          <table id="benchmark-tally" class="benchmark-tally">
-            <thead>
-              <tr>
-                <th>Model</th>
-                <th>Runs</th>
-                <th>Canary hit</th>
-                <th>Judge compliance</th>
-                <th>Human-confirmed</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
-          <div id="benchmark-rows" class="benchmark-rows"></div>
-        </div>
+        <iframe id="docs-frame" src="/docs/" title="Code documentation"></iframe>
       </section>
-    </section>
-
-    <section id="saved" class="saved-section" aria-labelledby="saved-title">
-      <div class="saved-header">
-        <h2 id="saved-title" class="saved-title">
-          Saved transcripts <span id="saved-count" class="saved-count"></span>
-        </h2>
-        <button id="saved-refresh-btn" class="btn btn-quiet" type="button">
-          Refresh
-        </button>
-      </div>
-      <ul id="saved-list" class="saved-list" hidden></ul>
-      <p id="saved-empty" class="saved-empty" hidden>No transcripts saved yet.</p>
-    </section>
-
-  </main>
+    </main>
+  </div>
   <script src="/app.js"></script>
 </body>
 </html>
