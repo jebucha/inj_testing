@@ -1069,3 +1069,135 @@ def test_summary_read_has_no_side_effects(api, monkeypatch):
     finally:
         release_fetch.set()
         thread.join(timeout=15)
+
+
+# --- T-TRANSCRIPT-SUMMARIZATION-062 .. 065: apiKeyEnv resolution --------------
+
+
+def _env_key_config(literal_key=None, env_var="RADAI_API_KEY"):
+    """A single-provider config whose options carry ``apiKeyEnv`` (and,
+    optionally, a literal ``apiKey`` alongside it)."""
+    options = {"baseURL": "http://localhost:8181/v1"}
+    if literal_key is not None:
+        options["apiKey"] = literal_key
+    options["apiKeyEnv"] = env_var
+    return {
+        "provider": {
+            "radai": {
+                "name": "Radai Local",
+                "options": options,
+                "models": {"model-a": "Model A"},
+            }
+        }
+    }
+
+
+def test_api_key_env_resolved_as_bearer(tmp_path, monkeypatch):
+    """T-TRANSCRIPT-SUMMARIZATION-062"""
+    config_file = tmp_path / "providers.json"
+    monkeypatch.setenv(
+        "PROVIDERS_CONFIG", _write_config(config_file, _env_key_config())
+    )
+    monkeypatch.setenv("RADAI_API_KEY", "sk-env-key-1")
+    transcript_dir = tmp_path / "transcripts"
+    transcript_dir.mkdir()
+    monkeypatch.setenv("TRANSCRIPT_DIR", str(transcript_dir))
+    ok = lambda call: _fake_response({"choices": [{"message": {"content": "s"}}]})
+    calls = _recorded_post(monkeypatch, ok)
+    client = TestClient(create_app())
+
+    with client:
+        response = client.post(
+            "/api/summarize",
+            json={"text": "text", "name": "video.txt",
+                  "provider": "radai", "model": "model-a"},
+        )
+
+    assert response.status_code == 200
+    assert len(calls) == 1
+    # the backend request carries the variable's value as the bearer token
+    assert calls[0]["headers"]["Authorization"] == "Bearer sk-env-key-1"
+
+
+def test_api_key_env_precedes_literal_key(tmp_path, monkeypatch):
+    """T-TRANSCRIPT-SUMMARIZATION-063"""
+    monkeypatch.setenv(
+        "PROVIDERS_CONFIG",
+        _write_config(tmp_path / "providers.json",
+                      _env_key_config(literal_key="sk-literal-key")),
+    )
+    monkeypatch.setenv("RADAI_API_KEY", "sk-env-key-1")
+
+    result = load_providers()
+
+    # the effective key is the variable's value, not the literal
+    assert result.providers[0].api_key == "sk-env-key-1"
+
+
+def test_api_key_env_missing_degrades_to_keyless(tmp_path, monkeypatch):
+    """T-TRANSCRIPT-SUMMARIZATION-064"""
+    monkeypatch.setenv(
+        "PROVIDERS_CONFIG",
+        _write_config(tmp_path / "providers.json", _env_key_config()),
+    )
+    monkeypatch.delenv("RADAI_API_KEY", raising=False)
+    buf = io.StringIO()
+    applog.setup_logging(stream=buf)
+
+    # variable unset: the provider stays usable with no API key, and exactly
+    # one warning event is logged...
+    result = load_providers()
+    provider = result.providers[0]
+    assert provider.api_key is None
+    assert provider.base_url == "http://localhost:8181/v1"
+    entries = _entries(buf, "provider_api_key_env_missing")
+    assert len(entries) == 1
+    event = entries[0]
+    assert event["level"] == "warning"
+    assert event["provider"] == "radai"
+    assert event["variable"] == "RADAI_API_KEY"
+    # ...carrying only the provider id and the variable name — never a key
+    # value or anything else.
+    assert set(event) == {"timestamp", "level", "event", "provider", "variable"}
+
+    # variable set to the empty string: the same degradation, one more warning
+    monkeypatch.setenv("RADAI_API_KEY", "")
+    result = load_providers()
+    assert result.providers[0].api_key is None
+    assert len(_entries(buf, "provider_api_key_env_missing")) == 2
+
+    # and a request against the keyless provider still succeeds (no crash, no
+    # auth header)
+    calls = _recorded_post(
+        monkeypatch,
+        lambda call: _fake_response({"choices": [{"message": {"content": "s"}}]}),
+    )
+    summarize_mod.summarize_with_provider(result.providers[0], "model-a", "text")
+    assert calls[0]["headers"].get("Authorization") is None
+
+
+def test_api_key_env_absent_from_provider_listing(tmp_path, monkeypatch):
+    """T-TRANSCRIPT-SUMMARIZATION-065"""
+    monkeypatch.setenv(
+        "PROVIDERS_CONFIG",
+        _write_config(tmp_path / "providers.json", _env_key_config()),
+    )
+    monkeypatch.setenv("RADAI_API_KEY", "sk-env-key-1")
+    transcript_dir = tmp_path / "transcripts"
+    transcript_dir.mkdir()
+    monkeypatch.setenv("TRANSCRIPT_DIR", str(transcript_dir))
+    client = TestClient(create_app())
+
+    with client:
+        response = client.get("/api/providers")
+
+    assert response.status_code == 200
+    body = response.json()
+    radai = next(p for p in body["providers"] if p["id"] == "radai")
+    # the provider is listed by id, display name, and model ids...
+    assert set(radai.keys()) == {"id", "name", "models", "addedModels"}
+    assert radai["name"] == "Radai Local"
+    assert radai["models"] == ["model-a"]
+    # ...and neither the resolved key nor the variable's value appears
+    # anywhere in the response body
+    assert "sk-env-key-1" not in response.text

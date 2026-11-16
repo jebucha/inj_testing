@@ -54,7 +54,13 @@ def _parse_provider(provider_id: str, value: object) -> Provider | None:
     A provider is usable when it carries a non-empty string
     ``options.baseURL`` and a non-empty ``models`` map (its keys are the
     model ids, in file order). Unknown fields are ignored, and a missing or
-    empty display name falls back to the provider id.
+    empty display name falls back to the provider id. A non-empty string
+    ``options.apiKeyEnv`` names the environment variable whose value is the
+    effective API key; it takes precedence over a literal ``options.apiKey``,
+    and a non-string ``apiKeyEnv`` is ignored with fallback to the literal
+    key or ``None``. When the named variable is unset or empty, the provider
+    stays usable as keyless and one ``provider_api_key_env_missing`` warning
+    event is logged (provider id and variable name, never a key value).
     """
     if not isinstance(value, dict):
         return None
@@ -67,6 +73,23 @@ def _parse_provider(provider_id: str, value: object) -> Provider | None:
     api_key = options.get("apiKey")
     if not isinstance(api_key, str):
         api_key = None
+    api_key_env = options.get("apiKeyEnv")
+    if isinstance(api_key_env, str) and api_key_env:
+        # The named variable's value is the effective key (resolved at each
+        # config read); while it is set, a literal key is never consulted.
+        env_value = os.environ.get(api_key_env)
+        if env_value:
+            api_key = env_value
+        else:
+            # Unset or empty variable: the provider stays usable as keyless,
+            # with one warning naming the provider and the variable — never
+            # any key value.
+            api_key = None
+            get_logger().warning(
+                "provider_api_key_env_missing",
+                provider=provider_id,
+                variable=api_key_env,
+            )
     models = value.get("models")
     if not isinstance(models, dict) or not models:
         return None

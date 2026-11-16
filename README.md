@@ -218,8 +218,11 @@ re-read on every request, so edits take effect without a restart. Shape:
 - `provider` maps provider ids to entries with a display `name`,
   `options.baseURL` (required — the OpenAI-compatible root, e.g.
   `http://localhost:11434/v1`), an optional `options.apiKey` (omit for
-  keyless local backends), and a `models` map (its keys are the model ids,
-  shown in the picker in file order). Unknown fields are ignored.
+  keyless local backends) or an optional `options.apiKeyEnv` (a string
+  naming the environment variable whose value is the API key; when set it
+  takes precedence over a literal `apiKey`), and a `models` map (its keys
+  are the model ids, shown in the picker in file order). Unknown fields are
+  ignored.
 - `default` (optional) names the provider pre-selected in the picker;
   without it, the first provider in the file is the default.
 - API keys and base URLs never reach the browser — the picker shows ids
@@ -244,6 +247,14 @@ Keep your real file elsewhere (e.g.
 `/etc/inj-testing/providers.json`) and point the host-side
 `PROVIDERS_CONFIG` at it from `.env` (git-ignored) — or, for local dev, set
 `PROVIDERS_CONFIG` in the shell when running `uv run python -m app.main`.
+Alternatively, keep the key out of the config file entirely: set
+`options.apiKeyEnv` to the name of an environment variable and provide the
+variable operator-side (a compose `env_file:` entry, a shell export, or a CI
+secret); the app resolves it from the process environment on each config
+read. An unset or empty variable leaves that provider usable as keyless and
+logs a `provider_api_key_env_missing` warning; unlike the config file,
+environment values are fixed at process start, so changing only the
+variable requires a restart.
 
 **Behavior and limits.** Summarization runs independently of the
 transcript fetch chain (it is not subject to the single-flight `BUSY`

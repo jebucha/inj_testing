@@ -18,6 +18,9 @@ copy or edit it to create the real `providers.json`, keeping secrets out of vers
   - `name` — display name shown in the UI; falls back to `id` if omitted
   - `options.baseURL` — required; API endpoint URL for the provider
   - `options.apiKey` — optional; omitted or non-string values are treated as "no key"
+  - `options.apiKeyEnv` — optional; string naming the environment variable whose value
+    is the API key. When set, it takes precedence over a literal `apiKey`; when the
+    variable is unset or empty, the provider is usable as keyless (see `docs/providers.md`)
   - `models` — required map of model-id → description (any string value); keys become
     the selectable model options in the UI
 
@@ -33,6 +36,16 @@ copy or edit it to create the real `providers.json`, keeping secrets out of vers
             "models": {
                 "<model-id-1>": "Model description or label",
                 "<model-id-2>": "Another model"
+            }
+        },
+        "<id-keyed-by-env>": {
+            "name": "<display name>",
+            "options": {
+                "baseURL": "https://api.example.com/v1",
+                "apiKeyEnv": "<ENV_VARIABLE_NAME>"
+            },
+            "models": {
+                "<model-id-1>": "Model description or label"
             }
         }
     },
@@ -57,6 +70,10 @@ The app emits `config_load_failed` (error level) when the config file exists but
 parsed — carrying the path, reason (`invalid_json`, `invalid_structure`), and a detail field
 with the parse error message. A missing file produces no log entry; it is treated as "not
 configured" rather than an error state.
+
+The app also emits `provider_api_key_env_missing` (warning level) when a provider's
+`options.apiKeyEnv` names a variable that is unset or empty — carrying the provider id and
+the variable name, never any key value (see `docs/providers.md`).
 
 ## Error codes raised/handled
 

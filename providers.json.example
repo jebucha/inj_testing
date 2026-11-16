@@ -10,6 +10,16 @@
                 "gpt-4o-mini": "GPT-4o Mini (cost-effective)",
                 "gpt-4o": "GPT-4o"
             }
+        },
+        "openai-env": {
+            "name": "OpenAI (key from environment)",
+            "options": {
+                "baseURL": "https://api.openai.com/v1",
+                "apiKeyEnv": "OPENAI_API_KEY"
+            },
+            "models": {
+                "gpt-4o-mini": "GPT-4o Mini (cost-effective)"
+            }
         }
     },
     "default": "openai-compatible"

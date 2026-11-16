@@ -44,6 +44,18 @@ structure of usable providers plus the default provider id, or the empty
   a non-empty `models` map** (its keys are the model ids, in JSON file
   order). Unknown fields are ignored; a missing/empty display name falls
   back to the provider id; `apiKey` may be absent (keyless local backends).
+- **`apiKeyEnv` resolution (a sibling field, not interpolation):** a
+  non-empty string `options.apiKeyEnv` names the environment variable whose
+  value is the effective API key. It takes precedence over a literal
+  `options.apiKey` — while the variable is set, the literal is never
+  consulted. The variable is resolved from the process environment at each
+  config read (per request, never cached; the app never loads an env file).
+  When the variable is unset or empty, the provider stays usable as keyless
+  and one `provider_api_key_env_missing` warning is logged; a non-string
+  `apiKeyEnv` is ignored with fallback to the literal key or no key. Note:
+  unlike the config file, environment values are fixed at process start —
+  changing only the variable's value requires a restart even though editing
+  the file takes effect on the next request.
 - **`default` resolution:** an explicit top-level `"default"` key wins when
   it names a usable provider; otherwise the first provider in file order;
   otherwise `None`.
@@ -55,6 +67,9 @@ structure of usable providers plus the default provider id, or the empty
 - `config_load_failed` (error): `path`, `reason`
   (`invalid_json`, `invalid_structure`, or the OS exception type name),
   `detail` (the parse error — never file contents).
+- `provider_api_key_env_missing` (warning): `provider` (the provider id),
+  `variable` (the `apiKeyEnv` variable name) — one per provider per config
+  read when the variable is unset or empty; never any key value.
 
 ## Error codes raised/handled
 

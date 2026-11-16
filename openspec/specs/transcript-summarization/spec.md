@@ -7,7 +7,7 @@ Summarizes the currently displayed transcript with an operator-configured OpenAI
 ## Requirements
 
 ### Requirement: Provider configuration file
-The application SHALL read the summarization provider configuration from a JSON file at the `PROVIDERS_CONFIG` path (default `providers.json`). The file SHALL contain a top-level `provider` object mapping ids to objects with a display name, `options` (`baseURL` required, `apiKey` optional), and a `models` object keyed by model id in file order. Unknown fields SHALL be ignored and it SHALL be re-read per request. A missing file, malformed JSON, or no usable provider means "not configured".
+The application SHALL read the summarization provider configuration from a JSON file at the `PROVIDERS_CONFIG` path (default `providers.json`). The file SHALL contain a top-level `provider` object mapping ids to objects with a display name, `options` (`baseURL` required, `apiKey` optional, `apiKeyEnv` optional), and a `models` object keyed by model id in file order. Unknown fields SHALL be ignored and it SHALL be re-read per request. A missing file, malformed JSON, or no usable provider means "not configured".
 
 #### Scenario: Providers are read from the file
 - **WHEN** the config file lists provider `radai` with `options.baseURL` set and one model, and a request needs the provider list
@@ -61,6 +61,45 @@ The application SHALL read the summarization provider configuration from a JSON 
   - **ID:** T-TRANSCRIPT-SUMMARIZATION-038
   - **File:** tests/test_transcript_summarization.py::test_missing_display_name_falls_back_to_id
   - **Command:** python -m pytest tests/test_transcript_summarization.py::test_missing_display_name_falls_back_to_id -q
+  - **Pass:** exit code 0, no skipped tests
+
+### Requirement: Provider API key from environment
+A provider entry MAY name the bearer token's environment variable via an optional `options.apiKeyEnv` string. When present, that variable's value SHALL be the provider's API key, resolved from the process environment on each config read, never cached, taking precedence over a literal `options.apiKey`. When the variable is unset or empty, the provider SHALL remain usable as keyless and the application SHALL log a warning event carrying the provider id and the variable name, never any key value.
+
+#### Scenario: Env-named key is sent as the bearer token
+- **WHEN** the config file defines a provider with `options.apiKeyEnv` naming a variable whose value is set and non-empty in the process environment, and the summarize endpoint calls that provider
+- **THEN** the backend request carries the variable's value as the bearer token
+- **Test Requirement**
+  - **ID:** T-TRANSCRIPT-SUMMARIZATION-062
+  - **File:** tests/test_transcript_summarization.py::test_api_key_env_resolved_as_bearer
+  - **Command:** python -m pytest tests/test_transcript_summarization.py::test_api_key_env_resolved_as_bearer -q
+  - **Pass:** exit code 0, no skipped tests
+
+#### Scenario: apiKeyEnv takes precedence over a literal apiKey
+- **WHEN** a provider entry carries both a literal `options.apiKey` and `options.apiKeyEnv` naming a variable with a different value, and the provider list is read
+- **THEN** the provider's effective API key is the variable's value, not the literal
+- **Test Requirement**
+  - **ID:** T-TRANSCRIPT-SUMMARIZATION-063
+  - **File:** tests/test_transcript_summarization.py::test_api_key_env_precedes_literal_key
+  - **Command:** python -m pytest tests/test_transcript_summarization.py::test_api_key_env_precedes_literal_key -q
+  - **Pass:** exit code 0, no skipped tests
+
+#### Scenario: Unset or empty variable degrades to keyless with a warning
+- **WHEN** a provider entry carries `options.apiKeyEnv` naming a variable that is unset or set to an empty string in the process environment, and the provider list is read
+- **THEN** the provider is still usable with no API key, one warning event records the provider id and the variable name without any key value, and no request crashes
+- **Test Requirement**
+  - **ID:** T-TRANSCRIPT-SUMMARIZATION-064
+  - **File:** tests/test_transcript_summarization.py::test_api_key_env_missing_degrades_to_keyless
+  - **Command:** python -m pytest tests/test_transcript_summarization.py::test_api_key_env_missing_degrades_to_keyless -q
+  - **Pass:** exit code 0, no skipped tests
+
+#### Scenario: Resolved env key never appears in the provider listing
+- **WHEN** the config file defines a provider with `options.apiKeyEnv` whose variable is set, and `GET /api/providers` is requested
+- **THEN** the response lists the provider's id, display name, and model ids, and contains neither the resolved key nor the variable's value anywhere in the response body
+- **Test Requirement**
+  - **ID:** T-TRANSCRIPT-SUMMARIZATION-065
+  - **File:** tests/test_transcript_summarization.py::test_api_key_env_absent_from_provider_listing
+  - **Command:** python -m pytest tests/test_transcript_summarization.py::test_api_key_env_absent_from_provider_listing -q
   - **Pass:** exit code 0, no skipped tests
 
 ### Requirement: Provider listing endpoint
