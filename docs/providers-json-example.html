@@ -52,6 +52,9 @@ copy or edit it to create the real <code>providers.json</code>, keeping secrets 
 <li><code>name</code> — display name shown in the UI; falls back to <code>id</code> if omitted</li>
 <li><code>options.baseURL</code> — required; API endpoint URL for the provider</li>
 <li><code>options.apiKey</code> — optional; omitted or non-string values are treated as "no key"</li>
+<li><code>options.apiKeyEnv</code> — optional; string naming the environment variable whose value
+    is the API key. When set, it takes precedence over a literal <code>apiKey</code>; when the
+    variable is unset or empty, the provider is usable as keyless (see <code>docs/providers.md</code>)</li>
 <li><code>models</code> — required map of model-id → description (any string value); keys become
     the selectable model options in the UI</li>
 </ul>
@@ -66,6 +69,16 @@ copy or edit it to create the real <code>providers.json</code>, keeping secrets 
             &quot;models&quot;: {
                 &quot;&lt;model-id-1&gt;&quot;: &quot;Model description or label&quot;,
                 &quot;&lt;model-id-2&gt;&quot;: &quot;Another model&quot;
+            }
+        },
+        &quot;&lt;id-keyed-by-env&gt;&quot;: {
+            &quot;name&quot;: &quot;&lt;display name&gt;&quot;,
+            &quot;options&quot;: {
+                &quot;baseURL&quot;: &quot;https://api.example.com/v1&quot;,
+                &quot;apiKeyEnv&quot;: &quot;&lt;ENV_VARIABLE_NAME&gt;&quot;
+            },
+            &quot;models&quot;: {
+                &quot;&lt;model-id-1&gt;&quot;: &quot;Model description or label&quot;
             }
         }
     },
@@ -88,6 +101,9 @@ copy or edit it to create the real <code>providers.json</code>, keeping secrets 
 parsed — carrying the path, reason (<code>invalid_json</code>, <code>invalid_structure</code>), and a detail field
 with the parse error message. A missing file produces no log entry; it is treated as "not
 configured" rather than an error state.</p>
+<p>The app also emits <code>provider_api_key_env_missing</code> (warning level) when a provider's
+<code>options.apiKeyEnv</code> names a variable that is unset or empty — carrying the provider id and
+the variable name, never any key value (see <code>docs/providers.md</code>).</p>
 <h2>Error codes raised/handled</h2>
 <ul>
 <li><strong>Missing or unreadable file</strong> → app logs nothing at startup, returns empty provider list;

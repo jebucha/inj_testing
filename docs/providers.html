@@ -79,6 +79,18 @@ structure of usable providers plus the default provider id, or the empty
   a non-empty <code>models</code> map</strong> (its keys are the model ids, in JSON file
   order). Unknown fields are ignored; a missing/empty display name falls
   back to the provider id; <code>apiKey</code> may be absent (keyless local backends).</li>
+<li><strong><code>apiKeyEnv</code> resolution (a sibling field, not interpolation):</strong> a
+  non-empty string <code>options.apiKeyEnv</code> names the environment variable whose
+  value is the effective API key. It takes precedence over a literal
+  <code>options.apiKey</code> — while the variable is set, the literal is never
+  consulted. The variable is resolved from the process environment at each
+  config read (per request, never cached; the app never loads an env file).
+  When the variable is unset or empty, the provider stays usable as keyless
+  and one <code>provider_api_key_env_missing</code> warning is logged; a non-string
+  <code>apiKeyEnv</code> is ignored with fallback to the literal key or no key. Note:
+  unlike the config file, environment values are fixed at process start —
+  changing only the variable's value requires a restart even though editing
+  the file takes effect on the next request.</li>
 <li><strong><code>default</code> resolution:</strong> an explicit top-level <code>"default"</code> key wins when
   it names a usable provider; otherwise the first provider in file order;
   otherwise <code>None</code>.</li>
@@ -90,6 +102,9 @@ structure of usable providers plus the default provider id, or the empty
 <li><code>config_load_failed</code> (error): <code>path</code>, <code>reason</code>
   (<code>invalid_json</code>, <code>invalid_structure</code>, or the OS exception type name),
   <code>detail</code> (the parse error — never file contents).</li>
+<li><code>provider_api_key_env_missing</code> (warning): <code>provider</code> (the provider id),
+  <code>variable</code> (the <code>apiKeyEnv</code> variable name) — one per provider per config
+  read when the variable is unset or empty; never any key value.</li>
 </ul>
 <h2>Error codes raised/handled</h2>
 <p>None raised — all failures degrade to the empty <code>ProviderConfig</code>; the

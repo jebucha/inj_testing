@@ -1,12 +1,17 @@
-# Machine-local config (compose PORT override; see README)
+# Machine-local config (compose host-side overrides: PORT, TRANSCRIPTS_DIR,
+# PROVIDERS_CONFIG — interpolation only, never enters the container)
 .env
 
-# Operator env file (may hold live tokens)
+# Operator env file (may hold live tokens); the compose file passes it into
+# the container via env_file (provider apiKeyEnv variables — see README)
 env
 
-# Provider config (may carry API keys; see providers.json.example)
+# Provider config (may carry API keys; see providers.json.example).
+# providers.json is reserved for OpenCode's project config; the app's own
+# config lives in app-providers.json (mounted via PROVIDERS_CONFIG in .env).
 providers.json
 providers.json.bk
+app-providers.json
 .claude/
 .opencode/
 .agents/

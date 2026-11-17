@@ -30,6 +30,24 @@ services:
       # inside the container, defaulting to the cwd's providers.json).
       # Read-only: the app never writes the config.
       - "${PROVIDERS_CONFIG:-./providers.json}:/app/providers.json:ro"
+    # The operator env file (uncommitted `env` — NOT `.env`) is passed into
+    # the container, so the variables named by the mounted providers.json's
+    # options.apiKeyEnv resolve from the container's process environment
+    # (app/providers.py, resolved per config read). It must contain only
+    # container-side variables (API-key values); the host-side interpolation
+    # knobs (PORT, TRANSCRIPTS_DIR, PROVIDERS_CONFIG) stay in `.env`, which
+    # both compose implementations auto-load for interpolation only and never
+    # pass into the container. No environment: block is used on purpose:
+    # podman-compose v1 feeds a service's environment: values back into the
+    # ${...} substitution of the whole file, so pinning e.g.
+    # PROVIDERS_CONFIG=/app/providers.json would corrupt the host-side volume
+    # source above. The Dockerfile's ENV block already fixes the
+    # container-side values (PORT=8000, TRANSCRIPT_DIR=/transcripts). The
+    # short list form is the env_file syntax both implementations support
+    # (decision 4's key-set constraint). A missing env file is a hard error
+    # for both — create it (even empty) before the first up.
+    env_file:
+      - env
     healthcheck:
       # Probes the UI route with python — the astral/uv base image has no
       # curl, and no dedicated /health endpoint is added (design.md,

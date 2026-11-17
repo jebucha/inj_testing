@@ -80,7 +80,19 @@ Docker Compose v2 and podman-compose for parity.</p>
 </tbody>
 </table>
 <ul>
-<li><strong>Healthcheck:</strong> python urllib probe against <code>http://127.0.0.1:8000/</code></li>
+<li>
+<p><strong>Container-side environment:</strong> the uncommitted <code>env</code> file (a separate,
+  git-ignored file — <em>not</em> <code>.env</code>) is passed into the container with
+  <code>env_file:</code> so the variables named by the mounted <code>providers.json</code>'s
+  <code>options.apiKeyEnv</code> resolve from the container's process environment
+  (<code>app/providers.py</code>, per-request resolution). It holds container-side
+  variables only (API-key values). The short list form is used (the long form
+  with <code>required: false</code> is docker-compose-only; see decision 4). No
+  <code>environment:</code> block is used — see the env-file separation invariant.</p>
+</li>
+<li>
+<p><strong>Healthcheck:</strong> python urllib probe against <code>http://127.0.0.1:8000/</code></p>
+</li>
 <li>interval 30s, timeout 5s, retries 3, start_period 5s</li>
 <li><strong>Log rotation:</strong> json-file driver, max-size 10m, max-file 3 (max ~30 MB)</li>
 </ul>
@@ -92,8 +104,23 @@ Docker Compose v2 and podman-compose for parity.</p>
 <li><strong>Container-side paths are fixed.</strong> <code>/transcripts</code>, <code>/app/providers.json</code> —
   only the host side is overridable via <code>.env</code>. A future change that remaps
   container paths must update both the volume mount <em>and</em> healthcheck address.</li>
-<li><strong><code>.env</code> never committed.</strong> It contains machine-local overrides; tracked in
-  <code>.gitignore</code> (<code>.env</code>).</li>
+<li><strong><code>.env</code> never committed.</strong> It contains machine-local host-side overrides;
+  tracked in <code>.gitignore</code> (<code>.env</code>). It is optional (pure interpolation input;
+  both implementations tolerate its absence) and is never passed into the
+  container.</li>
+<li><strong><code>env</code> holds only container-side variables; <code>env</code> required.</strong> The <code>env</code>
+  file (git-ignored) carries the <code>apiKeyEnv</code> tokens and nothing else — no
+  host-side knobs. Because it is listed in <code>env_file:</code>, a missing <code>env</code> is a
+  hard error for both compose implementations — create it (an empty file is
+  fine) before the first <code>up</code>.</li>
+<li><strong>No <code>environment:</code> block in this file.</strong> podman-compose v1 feeds a
+  service's <code>environment:</code> values back into the <code>${...}</code> substitution of the
+  whole compose file (its <code>rec_subs</code>), so pinning a container-side value like
+  <code>PROVIDERS_CONFIG=/app/providers.json</code> would corrupt the host-side volume
+  source (<code>/app/providers.json:/app/providers.json:ro</code> → <code>statfs</code> failure).
+  Container-side values are fixed by the Dockerfile's <code>ENV</code> block instead.
+  A future change that needs container-side overrides must find a form that
+  behaves identically under both implementations.</li>
 <li><strong>Single-instance only.</strong> The fixed <code>container_name: inj-testing</code> means two
   compose projects on one host cannot coexist — acceptable for a single-user
   self-hosted tool.</li>
@@ -108,6 +135,10 @@ Docker Compose v2 and podman-compose for parity.</p>
   confirms the app process is alive but does <em>not</em> verify the fetch chain works</p>
 <h2>Error codes raised/handled</h2>
 <p>Failure modes and their observable effects:
+- <strong>Missing <code>env</code></strong> — <code>up</code> fails in both implementations: compose v2 rejects
+  at config load ("env file … not found"), podman-compose rejects at
+  container creation ("Env file at … does not exist"); create the file (even
+  empty) next to the compose file
 - <strong>Port conflict on host</strong> (EADDRINUSE) — compose logs show bind failure; fix by
   changing <code>PORT</code> in <code>.env</code> or killing the conflicting process
 - <strong>Missing TRANSCRIPTS_DIR</strong> on host — container starts but transcript saves fail
@@ -122,7 +153,23 @@ Docker Compose v2 and podman-compose for parity.</p>
 - <strong>decision 4</strong> — plain compose v2, no <code>version:</code> key; filename chosen for podman-compose compatibility over the newer <code>compose.yaml</code> convention
 - <strong>decision 5</strong> — fixed container name for single-instance assumption and smoke-test parity with documented <code>docker run</code> usage</p>
 <p>Also from later changes:
-- <code>add-transcript-summary</code> — provider config mount path <code>/app/providers.json</code> aligns with the app's runtime default; summary provider listing endpoint is secret-free (no keys exposed via compose)</p>
+- <code>add-transcript-summary</code> — provider config mount path <code>/app/providers.json</code> aligns with the app's runtime default; summary provider listing endpoint is secret-free (no keys exposed via compose)
+- <strong><code>env_file:</code> on a dedicated <code>env</code> file, no <code>environment:</code> pins</strong> — the
+  git-ignored <code>env</code> file (the operator env file already reserved in
+  <code>.gitignore</code> by the <code>provider-apikey-env</code> change) is passed into the
+  container so <code>options.apiKeyEnv</code> variables (live tokens) resolve from the
+  container process environment, without any app-side env-file loading (that
+  change's operator-side-wiring non-goal). A dedicated file — rather than
+  reusing <code>.env</code> plus <code>environment:</code> pins — is what keeps the two
+  implementations in step: podman-compose v1's <code>rec_subs</code> substitutes a
+  service's <code>environment:</code> values into the whole file, which would rewrite
+  the host-side <code>PROVIDERS_CONFIG</code> volume source to the container path
+  (<code>statfs</code> failure at <code>up</code>); and passing <code>.env</code> itself into the container
+  would leak host-side knobs (<code>PORT</code>, <code>PROVIDERS_CONFIG</code>) into the app
+  process, breaking decision 1's healthcheck and the fixed config mount
+  point. The Dockerfile <code>ENV</code> block fixes the container-side values;
+  short-list <code>env_file:</code> form only, per decision 4's compatibility
+  constraint</p>
 <h2>Cross-links</h2>
 <ul>
 <li><a href="Dockerfile.html"><code>Dockerfile</code></a> — builds this image (<code>build: .</code>)</li>

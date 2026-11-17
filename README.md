@@ -249,12 +249,17 @@ Keep your real file elsewhere (e.g.
 `PROVIDERS_CONFIG` in the shell when running `uv run python -m app.main`.
 Alternatively, keep the key out of the config file entirely: set
 `options.apiKeyEnv` to the name of an environment variable and provide the
-variable operator-side (a compose `env_file:` entry, a shell export, or a CI
-secret); the app resolves it from the process environment on each config
-read. An unset or empty variable leaves that provider usable as keyless and
-logs a `provider_api_key_env_missing` warning; unlike the config file,
-environment values are fixed at process start, so changing only the
-variable requires a restart.
+variable operator-side — with compose, put it in the uncommitted `env` file
+(git-ignored) next to the compose file: the compose file passes `env` into
+the container via `env_file:` (the file must exist, an empty file is fine;
+it holds container-side variables only — host-side knobs like `PORT`
+belong in `.env`), and for `docker run` / local dev use a shell export or
+`--env-file env`; the app resolves it from the process environment on each
+config read. An unset or empty variable leaves that provider usable as
+keyless and logs a `provider_api_key_env_missing` warning; unlike the
+config file, environment values are fixed at process start, so changing
+only the variable requires a recreate (`docker compose up -d`), not just a
+restart.
 
 **Behavior and limits.** Summarization runs independently of the
 transcript fetch chain (it is not subject to the single-flight `BUSY`
